@@ -249,17 +249,15 @@ auto write(Provider& provider, std::string_view filename, const OraDocument& doc
     if (auto res = provider.write_entry("data/" + name + ".png", *png, CompressionLevel::Default); !res) { cleanup(); return res; }
   }
 
-  std::vector<uint8_t> merged(doc.width * doc.height * 4, 0);
-  if (auto res = detail::process_blend(merged, doc.width, doc.height, doc.root_nodes, doc.layer_images); !res) { cleanup(); return res; }
-  auto merged_png = provider.encode_png(merged, doc.width, doc.height);
-  if (!merged_png) { cleanup(); return std::unexpected(merged_png.error()); }
-  if (auto res = provider.write_entry("mergedimage.png", *merged_png, CompressionLevel::Default); !res) { cleanup(); return res; }
+  if (!doc.merged_image_png) {
+    cleanup(); return detail::make_unexpected(Error::Code::InvalidOraDocument, "mergedimage.png", "caller-provided preview asset is required");
+  }
+  if (!doc.thumbnail_png) {
+    cleanup(); return detail::make_unexpected(Error::Code::InvalidOraDocument, "Thumbnails/thumbnail.png", "caller-provided thumbnail asset is required");
+  }
 
-  auto thumb_w = 256u; auto thumb_h = doc.height * thumb_w / doc.width;
-  auto thumb_rgba = detail::resize_image(merged, doc.width, doc.height, thumb_w, thumb_h);
-  auto thumb_png = provider.encode_png(thumb_rgba, thumb_w, thumb_h);
-  if (!thumb_png) { cleanup(); return std::unexpected(thumb_png.error()); }
-  if (auto res = provider.write_entry("Thumbnails/thumbnail.png", *thumb_png, CompressionLevel::Default); !res) { cleanup(); return res; }
+  if (auto res = provider.write_entry("mergedimage.png", *doc.merged_image_png, CompressionLevel::Default); !res) { cleanup(); return res; }
+  if (auto res = provider.write_entry("Thumbnails/thumbnail.png", *doc.thumbnail_png, CompressionLevel::Default); !res) { cleanup(); return res; }
 
   cleanup(); return {};
 }
