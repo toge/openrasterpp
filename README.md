@@ -110,10 +110,20 @@ cmake -S test/install_smoke -B build/install-smoke \
 以下は、単純な `.ora` ドキュメントを生成して書き出し、再度読み込む最小例です。
 
 ```cpp
+#include <fstream>
 #include <iostream>
+#include <iterator>
 #include <utility>
 
 #include <openraster.hpp>
+
+auto read_binary_file(std::string_view path) -> std::vector<uint8_t> {
+  auto file = std::ifstream(std::string{path}, std::ios::binary);
+  return std::vector<uint8_t>(
+    std::istreambuf_iterator<char>(file),
+    std::istreambuf_iterator<char>()
+  );
+}
 
 auto main() -> int {
   auto background = ora::ImageBuffer::make_blank(256, 256, 255);
@@ -126,7 +136,9 @@ auto main() -> int {
     .width = 256,
     .height = 256,
     .root_nodes = {ora::layer("background")},
-    .layer_images = {}
+    .layer_images = {},
+    .merged_image_png = read_binary_file("/abs/path/to/mergedimage.png"),
+    .thumbnail_png = read_binary_file("/abs/path/to/thumbnail.png")
   };
 
   doc.layer_images.emplace("background", std::move(*background));
@@ -147,3 +159,9 @@ auto main() -> int {
   return 0;
 }
 ```
+
+`ora::write()` は `mergedimage.png` と `Thumbnails/thumbnail.png` を
+内部生成しません。呼び出し側が OpenRaster 仕様に沿う PNG を用意し、
+`OraDocument` に設定してください。`ora::read()` で読み込んだ
+`OraDocument` をそのまま再書き出しする場合も、必要ならこれらの
+PNG バイト列を補ってから `write()` を呼び出します。

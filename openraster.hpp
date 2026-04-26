@@ -229,6 +229,9 @@ auto read(Provider& provider, std::string_view filename) -> std::expected<OraDoc
 
 /**
  * @brief OpenRasterファイルの書き込み
+ *
+ * `doc.merged_image_png` と `doc.thumbnail_png` には、呼び出し側が
+ * 用意した PNG バイト列を設定しておく必要があります。
  */
 template<OraProvider Provider>
 [[nodiscard]]
@@ -275,6 +278,9 @@ auto read(std::string_view filename) -> std::expected<OraDocument, Error>;
 
 /**
  * @brief デフォルトプロバイダを使用した書き込み（後方互換用）
+ *
+ * `doc.merged_image_png` と `doc.thumbnail_png` には、呼び出し側が
+ * 用意した PNG バイト列を設定しておく必要があります。
  */
 [[nodiscard]]
 auto write(std::string_view filename, const OraDocument& doc) -> std::expected<void, Error>;
