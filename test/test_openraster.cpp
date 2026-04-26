@@ -10,6 +10,9 @@ TEST_CASE("OraDocument initialization") {
         CHECK(doc.width == 100);
         CHECK(doc.height == 200);
         CHECK(doc.root_nodes.empty());
+        CHECK(doc.layer_images.empty());
+        CHECK_FALSE(doc.merged_image_png.has_value());
+        CHECK_FALSE(doc.thumbnail_png.has_value());
     }
 }
 

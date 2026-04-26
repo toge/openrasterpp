@@ -128,6 +128,8 @@ struct OraDocument {
   unsigned int height;
   std::vector<Node> root_nodes;
   std::map<std::string, ImageBuffer> layer_images;
+  std::optional<std::vector<uint8_t>> merged_image_png;
+  std::optional<std::vector<uint8_t>> thumbnail_png;
 };
 
 inline
