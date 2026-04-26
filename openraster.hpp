@@ -176,6 +176,7 @@ namespace detail {
 
 [[nodiscard]] auto make_unexpected(Error::Code code, std::string_view target, std::string_view detail = {}) -> std::unexpected<Error>;
 [[nodiscard]] auto resize_image(const std::vector<uint8_t>& src, unsigned int sw, unsigned int sh, unsigned int dw, unsigned int dh) -> std::vector<uint8_t>;
+[[nodiscard]] auto deserialize_stack(std::span<const uint8_t> xml_bytes) -> std::expected<OraDocument, Error>;
 auto blend_layer(std::vector<uint8_t>& canvas, unsigned int cw, unsigned int ch, const ImageBuffer& layer, int lx, int ly, float opacity, BlendMode mode) -> void;
 
 /**

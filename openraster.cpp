@@ -60,8 +60,8 @@ constexpr auto saturation(linear_rgb color) -> float { return max_component(colo
 
 constexpr auto clip_color(linear_rgb color) -> linear_rgb {
   auto const L = luminosity(color); auto const n = min_component(color); auto const x = max_component(color);
-  if (n < 0.0f) color = { L + ((color.red - L) * L) / (L - n), L + ((color.green - L) * L) / (L - n), L + ((color.red - L) * L) / (L - n) };
-  if (x > 1.0f) color = { L + ((color.red - L) * (1.0f - L)) / (x - L), L + ((color.green - L) * (1.0f - L)) / (x - L), L + ((color.red - L) * (1.0f - L)) / (x - L) };
+  if (n < 0.0f) color = { L + ((color.red - L) * L) / (L - n), L + ((color.green - L) * L) / (L - n), L + ((color.blue - L) * L) / (L - n) };
+  if (x > 1.0f) color = { L + ((color.red - L) * (1.0f - L)) / (x - L), L + ((color.green - L) * (1.0f - L)) / (x - L), L + ((color.blue - L) * (1.0f - L)) / (x - L) };
   return color;
 }
 
@@ -156,7 +156,7 @@ constexpr auto uses_porter_duff_only(BlendMode mode) -> bool {
   return mode == BlendMode::Plus || mode == BlendMode::DstIn || mode == BlendMode::DstOut || mode == BlendMode::SrcAtop || mode == BlendMode::DstAtop;
 }
 
-constexpr auto read_pixel(std::span<const uint8_t> rgba, std::size_t index) -> linear_rgba {
+auto read_pixel(std::span<const uint8_t> rgba, std::size_t index) -> linear_rgba {
   return { { srgb_to_linear_component(byte_to_unit(rgba[index + 0])), srgb_to_linear_component(byte_to_unit(rgba[index + 1])), srgb_to_linear_component(byte_to_unit(rgba[index + 2])) }, byte_to_unit(rgba[index + 3]) };
 }
 
@@ -321,63 +321,7 @@ public:
   }
 
   auto deserialize_stack(std::span<const uint8_t> xml_bytes) -> std::expected<OraDocument, Error> {
-    try {
-      std::string_view xml(reinterpret_cast<const char*>(xml_bytes.data()), xml_bytes.size());
-      OraDocument doc; size_t pos = 0;
-      std::set<std::string> layer_names;
-      std::vector<std::vector<Node>*> targets = {&doc.root_nodes};
-
-      auto get_attr = [](const std::map<std::string, std::string>& attrs, const std::string& key, const std::string& def) {
-        auto it = attrs.find(key);
-        return it != attrs.end() ? it->second : def;
-      };
-
-      while (auto tag = parse_next_tag(xml, pos)) {
-        if (tag->name == "image" && tag->kind != xml_tag::End) {
-          auto const w_str = get_attr(tag->attrs, "w", "0");
-          auto const h_str = get_attr(tag->attrs, "h", "0");
-          if (w_str.find_first_not_of("0123456789") != std::string::npos) throw std::invalid_argument("invalid width");
-          doc.width = std::stoul(w_str);
-          doc.height = std::stoul(h_str);
-        } else if (tag->name == "stack") {
-          if (tag->kind == xml_tag::End) {
-            if (targets.size() > 1) targets.pop_back();
-          } else {
-            auto const name = get_attr(tag->attrs, "name", "");
-            auto const x = std::stoi(get_attr(tag->attrs, "x", "0"));
-            auto const y = std::stoi(get_attr(tag->attrs, "y", "0"));
-            auto const vis = get_attr(tag->attrs, "visibility", "visible") == "visible";
-            auto const opacity = std::stof(get_attr(tag->attrs, "opacity", "1.0"));
-            auto const blend_str = get_attr(tag->attrs, "composite-op", "svg:src-over");
-            auto blend = from_string(blend_str);
-            if (!blend) return detail::make_unexpected(Error::Code::XmlParseFailed, blend_str, "invalid blend mode");
-            
-            Node n{Node::Type::Stack, name, x, y, vis, opacity, *blend, {}};
-            targets.back()->push_back(std::move(n));
-            if (tag->kind == xml_tag::Start) {
-              targets.push_back(&targets.back()->back().children);
-            }
-          }
-        } else if (tag->name == "layer" && tag->kind != xml_tag::End) {
-          auto const name = get_attr(tag->attrs, "name", "");
-          if (not layer_names.insert(name).second) return detail::make_unexpected(Error::Code::InvalidOraDocument, name, "duplicate layer name");
-          
-          auto const x = std::stoi(get_attr(tag->attrs, "x", "0"));
-          auto const y = std::stoi(get_attr(tag->attrs, "y", "0"));
-          auto const vis = get_attr(tag->attrs, "visibility", "visible") == "visible";
-          auto const opacity = std::stof(get_attr(tag->attrs, "opacity", "1.0"));
-          auto const blend_str = get_attr(tag->attrs, "composite-op", "svg:src-over");
-          auto blend = from_string(blend_str);
-          if (!blend) return detail::make_unexpected(Error::Code::XmlParseFailed, blend_str, "invalid blend mode");
-          
-          Node n{Node::Type::Layer, name, x, y, vis, opacity, *blend, {}};
-          targets.back()->push_back(std::move(n));
-        }
-      }
-      return doc;
-    } catch (const std::exception& e) {
-      return detail::make_unexpected(Error::Code::XmlParseFailed, "stack.xml", e.what());
-    }
+    return detail::deserialize_stack(xml_bytes);
   }
 
 private:
@@ -389,6 +333,83 @@ namespace detail {
 
 auto make_unexpected(Error::Code code, std::string_view target, std::string_view detail) -> std::unexpected<Error> {
   return std::unexpected(Error{code, std::string{target} + (detail.empty() ? "" : ": ") + std::string{detail}});
+}
+
+auto deserialize_stack(std::span<const uint8_t> xml_bytes) -> std::expected<OraDocument, Error> {
+  try {
+    std::string_view xml(reinterpret_cast<const char*>(xml_bytes.data()), xml_bytes.size());
+    OraDocument doc;
+    size_t pos = 0;
+    std::set<std::string> layer_names;
+    std::vector<std::size_t> path;
+
+    auto get_attr = [](const std::map<std::string, std::string>& attrs, const std::string& key, const std::string& def) {
+      auto it = attrs.find(key);
+      return it != attrs.end() ? it->second : def;
+    };
+    auto get_target = [&doc](const std::vector<std::size_t>& current_path) -> std::vector<Node>* {
+      auto* current = &doc.root_nodes;
+      for (auto const idx : current_path) {
+        if (idx >= current->size()) {
+          return nullptr;
+        }
+        current = &(*current)[idx].children;
+      }
+      return current;
+    };
+
+    while (auto tag = parse_next_tag(xml, pos)) {
+      if (tag->name == "image" && tag->kind != xml_tag::End) {
+        auto const w_str = get_attr(tag->attrs, "w", "0");
+        auto const h_str = get_attr(tag->attrs, "h", "0");
+        if (w_str.find_first_not_of("0123456789") != std::string::npos) throw std::invalid_argument("invalid width");
+        doc.width = std::stoul(w_str);
+        doc.height = std::stoul(h_str);
+      } else if (tag->name == "stack") {
+        if (tag->kind == xml_tag::End) {
+          if (!path.empty()) {
+            path.pop_back();
+          }
+        } else {
+          auto const name = get_attr(tag->attrs, "name", "");
+          auto const x = std::stoi(get_attr(tag->attrs, "x", "0"));
+          auto const y = std::stoi(get_attr(tag->attrs, "y", "0"));
+          auto const vis = get_attr(tag->attrs, "visibility", "visible") == "visible";
+          auto const opacity = std::stof(get_attr(tag->attrs, "opacity", "1.0"));
+          auto const blend_str = get_attr(tag->attrs, "composite-op", "svg:src-over");
+          auto blend = from_string(blend_str);
+          if (!blend) return detail::make_unexpected(Error::Code::XmlParseFailed, blend_str, "invalid blend mode");
+
+          auto* target = get_target(path);
+          if (target == nullptr) return detail::make_unexpected(Error::Code::InvalidOraDocument, "stack.xml", "invalid stack nesting");
+
+          target->push_back(Node{Node::Type::Stack, name, x, y, vis, opacity, *blend, {}});
+          if (tag->kind == xml_tag::Start) {
+            path.push_back(target->size() - 1);
+          }
+        }
+      } else if (tag->name == "layer" && tag->kind != xml_tag::End) {
+        auto const name = get_attr(tag->attrs, "name", "");
+        if (not layer_names.insert(name).second) return detail::make_unexpected(Error::Code::InvalidOraDocument, name, "duplicate layer name");
+
+        auto const x = std::stoi(get_attr(tag->attrs, "x", "0"));
+        auto const y = std::stoi(get_attr(tag->attrs, "y", "0"));
+        auto const vis = get_attr(tag->attrs, "visibility", "visible") == "visible";
+        auto const opacity = std::stof(get_attr(tag->attrs, "opacity", "1.0"));
+        auto const blend_str = get_attr(tag->attrs, "composite-op", "svg:src-over");
+        auto blend = from_string(blend_str);
+        if (!blend) return detail::make_unexpected(Error::Code::XmlParseFailed, blend_str, "invalid blend mode");
+
+        auto* target = get_target(path);
+        if (target == nullptr) return detail::make_unexpected(Error::Code::InvalidOraDocument, "stack.xml", "invalid layer nesting");
+
+        target->push_back(Node{Node::Type::Layer, name, x, y, vis, opacity, *blend, {}});
+      }
+    }
+    return doc;
+  } catch (const std::exception& e) {
+    return detail::make_unexpected(Error::Code::XmlParseFailed, "stack.xml", e.what());
+  }
 }
 
 auto blend_layer(std::vector<uint8_t>& canvas, unsigned int cw, unsigned int ch, const ImageBuffer& layer, int lx, int ly, float opacity, BlendMode mode) -> void {
