@@ -1,3 +1,8 @@
+/**
+ * @file openraster.cpp
+ * @brief `openraster.hpp` で宣言した OpenRaster API の既定実装を提供します。
+ */
+
 #include "openraster.hpp"
 
 #include <cctype>
@@ -24,9 +29,30 @@ namespace ora {
 
 namespace {
 
-struct linear_rgb { float red, green, blue; };
-struct linear_rgba { linear_rgb rgb; float alpha; };
-struct composite_factors { float source, backdrop; };
+/**
+ * @brief 線形色空間上の RGB 値です。
+ */
+struct linear_rgb {
+  float red;   ///< 赤成分です。
+  float green; ///< 緑成分です。
+  float blue;  ///< 青成分です。
+};
+
+/**
+ * @brief 線形色空間上の RGBA 値です。
+ */
+struct linear_rgba {
+  linear_rgb rgb; ///< RGB 成分です。
+  float alpha;    ///< アルファ成分です。
+};
+
+/**
+ * @brief Porter-Duff 合成時に使う係数です。
+ */
+struct composite_factors {
+  float source;   ///< ソース側へ掛ける係数です。
+  float backdrop; ///< 背景側へ掛ける係数です。
+};
 
 constexpr auto clamp_unit(float value) -> float { return std::clamp(value, 0.0f, 1.0f); }
 constexpr auto absolute_difference(float lhs, float rhs) -> float { return lhs < rhs ? rhs - lhs : lhs - rhs; }
@@ -156,10 +182,22 @@ constexpr auto uses_porter_duff_only(BlendMode mode) -> bool {
   return mode == BlendMode::Plus || mode == BlendMode::DstIn || mode == BlendMode::DstOut || mode == BlendMode::SrcAtop || mode == BlendMode::DstAtop;
 }
 
+/**
+ * @brief RGBA バッファから 1 ピクセルを線形色空間へ展開して読み取ります。
+ * @param rgba 元の RGBA バッファです。
+ * @param index 読み取り開始位置です。
+ * @return 線形色空間へ変換したピクセル値です。
+ */
 auto read_pixel(std::span<const uint8_t> rgba, std::size_t index) -> linear_rgba {
   return { { srgb_to_linear_component(byte_to_unit(rgba[index + 0])), srgb_to_linear_component(byte_to_unit(rgba[index + 1])), srgb_to_linear_component(byte_to_unit(rgba[index + 2])) }, byte_to_unit(rgba[index + 3]) };
 }
 
+/**
+ * @brief 線形色空間の 1 ピクセルを RGBA バッファへ書き戻します。
+ * @param rgba 書き込み先 RGBA バッファです。
+ * @param index 書き込み開始位置です。
+ * @param pixel 書き込むピクセル値です。
+ */
 auto write_pixel(std::vector<uint8_t>& rgba, std::size_t index, linear_rgba pixel) -> void {
   auto const crgb = clamp_rgb(pixel.rgb);
   rgba[index + 0] = unit_to_byte(linear_to_srgb_component(crgb.red));
@@ -177,6 +215,11 @@ constexpr auto compose_pixel(BlendMode mode, linear_rgba b, linear_rgba s) -> li
   return {clamp_rgb(multiply(out_pre, 1.0f / out_a)), clamp_unit(out_a)};
 }
 
+/**
+ * @brief XML 特殊文字をエスケープします。
+ * @param str エスケープ対象文字列です。
+ * @return XML 属性値へ安全に埋め込める文字列です。
+ */
 auto escape_xml(std::string_view str) -> std::string {
   auto res = std::string{};
   for (auto c : str) {
@@ -188,6 +231,11 @@ auto escape_xml(std::string_view str) -> std::string {
   return res;
 }
 
+/**
+ * @brief 基本的な XML エンティティ参照をデコードします。
+ * @param str デコード対象文字列です。
+ * @return 実体参照を復元した文字列です。
+ */
 auto decode_xml_entities(std::string_view str) -> std::string {
   auto res = std::string{};
   for (size_t i = 0; i < str.size(); ++i) {
@@ -207,12 +255,21 @@ auto decode_xml_entities(std::string_view str) -> std::string {
   return res;
 }
 
+/**
+ * @brief `stack.xml` 解析中に扱う単一タグの表現です。
+ */
 struct xml_tag {
   enum { Start, End, SelfClosing } kind;
   std::string name;
   std::map<std::string, std::string> attrs;
 };
 
+/**
+ * @brief XML 文字列から次のタグを 1 つだけ読み取ります。
+ * @param xml 入力 XML 文字列です。
+ * @param pos 読み取り位置です。返却時には次の探索位置へ進みます。
+ * @return 読み取ったタグ、終端に達した場合は `std::nullopt` を返します。
+ */
 auto parse_next_tag(std::string_view xml, size_t& pos) -> std::optional<xml_tag> {
   pos = xml.find('<', pos); if (pos == std::string_view::npos) return std::nullopt;
   if (xml.substr(pos, 4) == "<!--") { pos = xml.find("-->", pos) + 3; return parse_next_tag(xml, pos); }
@@ -235,6 +292,13 @@ auto parse_next_tag(std::string_view xml, size_t& pos) -> std::optional<xml_tag>
   pos++; return tag;
 }
 
+/**
+ * @brief ノードを `stack.xml` 用の XML 文字列へ再帰的に変換します。
+ * @param node 変換対象ノードです。
+ * @param indent_level 現在のインデント段数です。
+ * @param ss 浮動小数点整形に再利用する文字列ストリームです。
+ * @return 生成した XML 断片です。
+ */
 auto generate_node_xml(const Node& node, int indent_level, std::ostringstream& ss) -> std::string {
   auto xml = std::string(indent_level * 2, ' ');
   ss.str(""); ss.clear(); ss << node.opacity; auto const opacity_str = ss.str();
@@ -253,8 +317,17 @@ auto generate_node_xml(const Node& node, int indent_level, std::ostringstream& s
 
 } // namespace
 
+/**
+ * @brief ZIP と PNG を使った既定の ORA 入出力 Provider 実装です。
+ */
 class DefaultOraProvider {
 public:
+  /**
+   * @brief ORA アーカイブを開きます。
+   * @param path 対象アーカイブのパスです。
+   * @param mode 読み込みまたは書き込みモードです。
+   * @return 成功時は空の `expected`、失敗時はエラーを返します。
+   */
   auto open_archive(std::string_view path, ArchiveMode mode) -> std::expected<void, Error> {
     if (mode == ArchiveMode::Read) {
       unzip_ = unzOpen(std::string{path}.c_str());
@@ -266,11 +339,19 @@ public:
     return {};
   }
 
+  /**
+   * @brief 開いているアーカイブを閉じます。
+   */
   void close_archive() {
     if (unzip_) { unzClose(unzip_); unzip_ = nullptr; }
     if (zip_) { zipClose(zip_, nullptr); zip_ = nullptr; }
   }
 
+  /**
+   * @brief ZIP エントリを丸ごと読み込みます。
+   * @param path 読み込むエントリパスです。
+   * @return 読み込んだバイト列、失敗時はエラーを返します。
+   */
   auto read_entry(std::string_view path) -> std::expected<std::vector<uint8_t>, Error> {
     if (!unzip_) return detail::make_unexpected(Error::Code::ZipReadFailed, path, "archive not open");
     if (unzLocateFile(unzip_, std::string{path}.c_str(), 1) != UNZ_OK) return detail::make_unexpected(Error::Code::InvalidOraDocument, path, "entry not found");
@@ -289,6 +370,13 @@ public:
     return data;
   }
 
+  /**
+   * @brief ZIP エントリへバイト列を書き込みます。
+   * @param path 書き込み先エントリパスです。
+   * @param data 書き込むバイト列です。
+   * @param level 圧縮レベルです。
+   * @return 成功時は空の `expected`、失敗時はエラーを返します。
+   */
   auto write_entry(std::string_view path, std::span<const uint8_t> data, CompressionLevel level) -> std::expected<void, Error> {
     if (!zip_) return detail::make_unexpected(Error::Code::ZipAddFileFailed, path, "archive not open");
     zip_fileinfo info = {};
@@ -300,18 +388,35 @@ public:
     return {};
   }
 
+  /**
+   * @brief RGBA バッファを PNG へエンコードします。
+   * @param rgba 入力 RGBA バッファです。
+   * @param w 画像幅です。
+   * @param h 画像高さです。
+   * @return PNG バイト列、失敗時はエラーを返します。
+   */
   auto encode_png(std::span<const uint8_t> rgba, unsigned int w, unsigned int h) -> std::expected<std::vector<uint8_t>, Error> {
     std::vector<uint8_t> png;
     if (auto err = lodepng::encode(png, rgba.data(), w, h); err != 0) return detail::make_unexpected(Error::Code::PngEncodeFailed, "buffer", lodepng_error_text(err));
     return png;
   }
 
+  /**
+   * @brief PNG バイト列を RGBA バッファへデコードします。
+   * @param data 入力 PNG バイト列です。
+   * @return 復元した画像、失敗時はエラーを返します。
+   */
   auto decode_png(std::span<const uint8_t> data) -> std::expected<DecodedImage, Error> {
     DecodedImage img;
     if (auto err = lodepng::decode(img.rgba, img.width, img.height, data.data(), data.size()); err != 0) return detail::make_unexpected(Error::Code::PngDecodeFailed, "buffer", lodepng_error_text(err));
     return img;
   }
 
+  /**
+   * @brief ドキュメント構造を `stack.xml` 文字列へ変換します。
+   * @param doc 変換対象ドキュメントです。
+   * @return `stack.xml` として保存できる XML 文字列です。
+   */
   auto serialize_stack(const OraDocument& doc) -> std::string {
     auto xml = std::string("<?xml version='1.0' encoding='UTF-8'?>\n<image version='0.0.5' w='" + std::to_string(doc.width) + "' h='" + std::to_string(doc.height) + "'>\n");
     std::ostringstream ss; ss << std::fixed << std::setprecision(2);
@@ -320,6 +425,11 @@ public:
     return xml;
   }
 
+  /**
+   * @brief `stack.xml` バイト列からドキュメント構造を復元します。
+   * @param xml_bytes `stack.xml` のバイト列です。
+   * @return 復元したドキュメント、失敗時はエラーを返します。
+   */
   auto deserialize_stack(std::span<const uint8_t> xml_bytes) -> std::expected<OraDocument, Error> {
     return detail::deserialize_stack(xml_bytes);
   }
@@ -331,10 +441,22 @@ private:
 
 namespace detail {
 
+/**
+ * @brief `Error` を `std::unexpected` として生成します。
+ * @param code エラー種別です。
+ * @param target エラー対象です。
+ * @param detail 補足説明です。
+ * @return 生成した `std::unexpected<Error>` を返します。
+ */
 auto make_unexpected(Error::Code code, std::string_view target, std::string_view detail) -> std::unexpected<Error> {
   return std::unexpected(Error{code, std::string{target} + (detail.empty() ? "" : ": ") + std::string{detail}});
 }
 
+/**
+ * @brief `stack.xml` を走査して `OraDocument` の構造を復元します。
+ * @param xml_bytes `stack.xml` の UTF-8 バイト列です。
+ * @return 復元したドキュメント、失敗時はエラーを返します。
+ */
 auto deserialize_stack(std::span<const uint8_t> xml_bytes) -> std::expected<OraDocument, Error> {
   try {
     std::string_view xml(reinterpret_cast<const char*>(xml_bytes.data()), xml_bytes.size());
@@ -412,6 +534,17 @@ auto deserialize_stack(std::span<const uint8_t> xml_bytes) -> std::expected<OraD
   }
 }
 
+/**
+ * @brief レイヤー画像をキャンバスへ直接合成します。
+ * @param canvas 合成先キャンバスです。
+ * @param cw キャンバス幅です。
+ * @param ch キャンバス高さです。
+ * @param layer 合成するレイヤー画像です。
+ * @param lx 合成位置の X オフセットです。
+ * @param ly 合成位置の Y オフセットです。
+ * @param opacity レイヤー不透明度です。
+ * @param mode 合成モードです。
+ */
 auto blend_layer(std::vector<uint8_t>& canvas, unsigned int cw, unsigned int ch, const ImageBuffer& layer, int lx, int ly, float opacity, BlendMode mode) -> void {
   for (unsigned int y = 0; y < layer.height(); ++y) {
     int cy = static_cast<int>(y) + ly; if (cy < 0 || cy >= static_cast<int>(ch)) continue;
@@ -423,6 +556,17 @@ auto blend_layer(std::vector<uint8_t>& canvas, unsigned int cw, unsigned int ch,
   }
 }
 
+/**
+ * @brief ノード列を再帰的に走査して 1 枚のキャンバスへ合成します。
+ * @param canvas 合成先キャンバスです。
+ * @param cw キャンバス幅です。
+ * @param ch キャンバス高さです。
+ * @param nodes 合成対象ノード列です。
+ * @param layer_images レイヤー画像の辞書です。
+ * @param parent_x 親スタックの X オフセットです。
+ * @param parent_y 親スタックの Y オフセットです。
+ * @return 合成に成功した場合は空の `expected`、失敗時はエラーを返します。
+ */
 auto process_blend(std::vector<uint8_t>& canvas, unsigned int cw, unsigned int ch,
                    std::span<const Node> nodes, const std::map<std::string, ImageBuffer>& layer_images,
                    int parent_x, int parent_y) -> std::expected<void, Error> {
@@ -442,6 +586,15 @@ auto process_blend(std::vector<uint8_t>& canvas, unsigned int cw, unsigned int c
   return {};
 }
 
+/**
+ * @brief 画像を単純平均で縮小・拡大します。
+ * @param src 入力 RGBA バッファです。
+ * @param sw 入力幅です。
+ * @param sh 入力高さです。
+ * @param dw 出力幅です。
+ * @param dh 出力高さです。
+ * @return リサイズ後の RGBA バッファです。
+ */
 auto resize_image(const std::vector<uint8_t>& src, unsigned int sw, unsigned int sh, unsigned int dw, unsigned int dh) -> std::vector<uint8_t> {
   std::vector<uint8_t> dst(dw * dh * 4);
   for (unsigned int y = 0; y < dh; ++y) {
@@ -460,11 +613,25 @@ auto resize_image(const std::vector<uint8_t>& src, unsigned int sw, unsigned int
 
 } // namespace detail
 
+/**
+ * @brief 入力 RGBA バイト列から `ImageBuffer` を生成します。
+ * @param w 画像幅です。
+ * @param h 画像高さです。
+ * @param rgba RGBA バイト列です。
+ * @return 妥当な画像バッファ、失敗時はエラーを返します。
+ */
 auto ImageBuffer::create(unsigned int w, unsigned int h, std::vector<uint8_t> rgba) -> std::expected<ImageBuffer, Error> {
   if (w==0 || h==0 || rgba.size() != static_cast<size_t>(w)*h*4) return detail::make_unexpected(Error::Code::InvalidImageBuffer, "invalid dimensions or size");
   return ImageBuffer(w, h, std::move(rgba));
 }
 
+/**
+ * @brief 指定サイズの空画像を生成します。
+ * @param w 画像幅です。
+ * @param h 画像高さです。
+ * @param a 初期アルファ値です。
+ * @return 生成した空画像、失敗時はエラーを返します。
+ */
 auto ImageBuffer::make_blank(unsigned int w, unsigned int h, uint8_t a) -> std::expected<ImageBuffer, Error> {
   if (w==0 || h==0) return detail::make_unexpected(Error::Code::InvalidImageBuffer, "invalid dimensions");
   std::vector<uint8_t> rgba(static_cast<size_t>(w)*h*4, 0);
@@ -472,6 +639,11 @@ auto ImageBuffer::make_blank(unsigned int w, unsigned int h, uint8_t a) -> std::
   return ImageBuffer(w, h, std::move(rgba));
 }
 
+/**
+ * @brief `BlendMode` を OpenRaster の属性文字列へ変換します。
+ * @param m 変換対象モードです。
+ * @return `composite-op` 属性に使う文字列です。
+ */
 auto to_string(BlendMode m) -> std::string_view {
   static const std::map<BlendMode, std::string_view> map = {
     {BlendMode::SrcOver, "svg:src-over"}, {BlendMode::Multiply, "svg:multiply"}, {BlendMode::Screen, "svg:screen"}, {BlendMode::Overlay, "svg:overlay"},
@@ -483,6 +655,11 @@ auto to_string(BlendMode m) -> std::string_view {
   return map.at(m);
 }
 
+/**
+ * @brief OpenRaster の属性文字列から `BlendMode` を復元します。
+ * @param sv 属性文字列です。
+ * @return 対応モード、未対応なら `std::nullopt` を返します。
+ */
 auto from_string(std::string_view sv) -> std::optional<BlendMode> {
   for (int i=0; i<=static_cast<int>(BlendMode::DstAtop); ++i) {
     auto m = static_cast<BlendMode>(i); if (to_string(m) == sv) return m;
@@ -490,21 +667,42 @@ auto from_string(std::string_view sv) -> std::optional<BlendMode> {
   return std::nullopt;
 }
 
+/**
+ * @brief 既定 Provider で ORA ドキュメントを読み込みます。
+ * @param filename 読み込むファイル名またはパスです。
+ * @return 読み込んだドキュメント、失敗時はエラーを返します。
+ */
 auto read(std::string_view filename) -> std::expected<OraDocument, Error> {
   DefaultOraProvider provider;
   return read(provider, filename);
 }
 
+/**
+ * @brief 既定 Provider で `ImageBuffer` を PNG バイト列へ変換します。
+ * @param image 変換対象画像です。
+ * @return PNG バイト列、失敗時はエラーを返します。
+ */
 auto encode_png(const ImageBuffer& image) -> std::expected<std::vector<uint8_t>, Error> {
   DefaultOraProvider provider;
   return encode_png(provider, image);
 }
 
+/**
+ * @brief 既定 Provider でプレビュー画像とサムネイルを生成します。
+ * @param doc 生成結果を書き戻すドキュメントです。
+ * @return 成功時は空の `expected`、失敗時はエラーを返します。
+ */
 auto render_preview_and_thumbnail(OraDocument& doc) -> std::expected<void, Error> {
   DefaultOraProvider provider;
   return render_preview_and_thumbnail(provider, doc);
 }
 
+/**
+ * @brief 既定 Provider で ORA ドキュメントを書き込みます。
+ * @param filename 書き込み先ファイル名またはパスです。
+ * @param doc 書き込むドキュメントです。
+ * @return 成功時は空の `expected`、失敗時はエラーを返します。
+ */
 auto write(std::string_view filename, const OraDocument& doc) -> std::expected<void, Error> {
   DefaultOraProvider provider;
   return write(provider, filename, doc);
