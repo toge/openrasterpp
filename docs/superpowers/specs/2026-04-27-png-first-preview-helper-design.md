@@ -119,11 +119,12 @@ preview/thumbnail contract intact.
 3. Blend the layer tree using `detail::process_blend()`.
 4. Encode the blended RGBA result as `doc.merged_image_png`.
 5. Generate a thumbnail by fitting the rendered image within a 256px maximum
-   dimension while preserving aspect ratio.
+   dimension while preserving aspect ratio. Images already within that bound are
+   not upscaled.
 6. Encode the thumbnail RGBA result as `doc.thumbnail_png`.
 
-The helper does not change `layer_images`; it only fills the two preview asset
-fields.
+The helper does not change `layer_images`; it overwrites `merged_image_png` and
+`thumbnail_png` with newly rendered PNG bytes.
 
 ### 5. Error handling
 
