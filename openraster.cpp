@@ -495,6 +495,16 @@ auto read(std::string_view filename) -> std::expected<OraDocument, Error> {
   return read(provider, filename);
 }
 
+auto encode_png(const ImageBuffer& image) -> std::expected<std::vector<uint8_t>, Error> {
+  DefaultOraProvider provider;
+  return encode_png(provider, image);
+}
+
+auto render_preview_and_thumbnail(OraDocument& doc) -> std::expected<void, Error> {
+  DefaultOraProvider provider;
+  return render_preview_and_thumbnail(provider, doc);
+}
+
 auto write(std::string_view filename, const OraDocument& doc) -> std::expected<void, Error> {
   DefaultOraProvider provider;
   return write(provider, filename, doc);

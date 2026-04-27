@@ -1,6 +1,7 @@
 #ifndef OPENRASTER_HPP__
 #define OPENRASTER_HPP__
 
+#include <algorithm>
 #include <concepts>
 #include <cstdint>
 #include <expected>
@@ -127,8 +128,11 @@ struct OraDocument {
   unsigned int width;
   unsigned int height;
   std::vector<Node> root_nodes;
-  std::map<std::string, ImageBuffer> layer_images;
+  // data/<layer>.png に書き出される PNG バイト列
+  std::map<std::string, std::vector<uint8_t>> layer_images;
+  // mergedimage.png に書き出される PNG バイト列
   std::optional<std::vector<uint8_t>> merged_image_png;
+  // Thumbnails/thumbnail.png に書き出される PNG バイト列
   std::optional<std::vector<uint8_t>> thumbnail_png;
 };
 
@@ -190,6 +194,68 @@ auto process_blend(std::vector<uint8_t>& canvas, unsigned int cw, unsigned int c
 
 } // namespace detail
 
+template<OraProvider Provider>
+[[nodiscard]]
+auto encode_png(Provider& provider, const ImageBuffer& image)
+    -> std::expected<std::vector<uint8_t>, Error> {
+  return provider.encode_png(image.rgba(), image.width(), image.height());
+}
+
+template<OraProvider Provider>
+auto render_preview_and_thumbnail(Provider& provider, OraDocument& doc)
+    -> std::expected<void, Error> {
+  if (doc.width == 0 || doc.height == 0) {
+    return detail::make_unexpected(Error::Code::InvalidOraDocument, "image", "invalid dimensions");
+  }
+
+  auto decoded_layer_images = std::map<std::string, ImageBuffer>{};
+  for (auto const& [name, png_bytes] : doc.layer_images) {
+    auto decoded = provider.decode_png(png_bytes);
+    if (!decoded) {
+      return std::unexpected(decoded.error());
+    }
+    auto buffer = ImageBuffer::create(decoded->width, decoded->height, std::move(decoded->rgba));
+    if (!buffer) {
+      return std::unexpected(buffer.error());
+    }
+    decoded_layer_images.emplace(name, std::move(*buffer));
+  }
+
+  auto merged_rgba = std::vector<uint8_t>(doc.width * doc.height * 4, 0);
+  if (auto result = detail::process_blend(merged_rgba, doc.width, doc.height, doc.root_nodes, decoded_layer_images); !result) {
+    return result;
+  }
+
+  auto merged_png = provider.encode_png(merged_rgba, doc.width, doc.height);
+  if (!merged_png) {
+    return std::unexpected(merged_png.error());
+  }
+
+  auto thumb_w = doc.width;
+  auto thumb_h = doc.height;
+  if (doc.width > 256 || doc.height > 256) {
+    if (doc.width >= doc.height) {
+      thumb_w = 256;
+      thumb_h = std::max(1u, doc.height * thumb_w / doc.width);
+    } else {
+      thumb_h = 256;
+      thumb_w = std::max(1u, doc.width * thumb_h / doc.height);
+    }
+  }
+
+  auto thumb_rgba = thumb_w == doc.width && thumb_h == doc.height
+      ? merged_rgba
+      : detail::resize_image(merged_rgba, doc.width, doc.height, thumb_w, thumb_h);
+  auto thumb_png = provider.encode_png(thumb_rgba, thumb_w, thumb_h);
+  if (!thumb_png) {
+    return std::unexpected(thumb_png.error());
+  }
+
+  doc.merged_image_png = std::move(*merged_png);
+  doc.thumbnail_png = std::move(*thumb_png);
+  return {};
+}
+
 /**
  * @brief OpenRasterファイルの読み込み
  */
@@ -214,9 +280,7 @@ auto read(Provider& provider, std::string_view filename) -> std::expected<OraDoc
         auto path = "data/" + node.name + ".png";
         auto data = provider.read_entry(path); if (!data) return std::unexpected(data.error());
         auto img = provider.decode_png(*data); if (!img) return std::unexpected(img.error());
-        auto buffer = ImageBuffer::create(img->width, img->height, std::move(img->rgba));
-        if (!buffer) return std::unexpected(buffer.error());
-        doc.layer_images.emplace(node.name, std::move(*buffer));
+        doc.layer_images.emplace(node.name, std::move(*data));
       } else {
         auto res = self(self, node.children); if (!res) return res;
       }
@@ -230,6 +294,7 @@ auto read(Provider& provider, std::string_view filename) -> std::expected<OraDoc
 /**
  * @brief OpenRasterファイルの書き込み
  *
+ * `doc.layer_images` には各レイヤーの PNG バイト列を、
  * `doc.merged_image_png` と `doc.thumbnail_png` には、呼び出し側が
  * 用意した PNG バイト列を設定しておく必要があります。
  */
@@ -246,10 +311,8 @@ auto write(Provider& provider, std::string_view filename, const OraDocument& doc
   auto xml = provider.serialize_stack(doc);
   if (auto res = provider.write_entry("stack.xml", std::span(reinterpret_cast<const uint8_t*>(xml.data()), xml.size()), CompressionLevel::Default); !res) { cleanup(); return res; }
 
-  for (auto const& [name, buffer] : doc.layer_images) {
-    auto png = provider.encode_png(buffer.rgba(), buffer.width(), buffer.height());
-    if (!png) { cleanup(); return std::unexpected(png.error()); }
-    if (auto res = provider.write_entry("data/" + name + ".png", *png, CompressionLevel::Default); !res) { cleanup(); return res; }
+  for (auto const& [name, png] : doc.layer_images) {
+    if (auto res = provider.write_entry("data/" + name + ".png", png, CompressionLevel::Default); !res) { cleanup(); return res; }
   }
 
   if (!doc.merged_image_png) {
@@ -277,8 +340,20 @@ class DefaultOraProvider;
 auto read(std::string_view filename) -> std::expected<OraDocument, Error>;
 
 /**
+ * @brief ImageBuffer を PNG バイト列へ変換
+ */
+[[nodiscard]]
+auto encode_png(const ImageBuffer& image) -> std::expected<std::vector<uint8_t>, Error>;
+
+/**
+ * @brief レイヤー PNG から mergedimage / thumbnail を生成して doc に設定
+ */
+auto render_preview_and_thumbnail(OraDocument& doc) -> std::expected<void, Error>;
+
+/**
  * @brief デフォルトプロバイダを使用した書き込み（後方互換用）
  *
+ * `doc.layer_images` には各レイヤーの PNG バイト列を、
  * `doc.merged_image_png` と `doc.thumbnail_png` には、呼び出し側が
  * 用意した PNG バイト列を設定しておく必要があります。
  */

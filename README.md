@@ -110,20 +110,10 @@ cmake -S test/install_smoke -B build/install-smoke \
 以下は、単純な `.ora` ドキュメントを生成して書き出し、再度読み込む最小例です。
 
 ```cpp
-#include <fstream>
 #include <iostream>
-#include <iterator>
 #include <utility>
 
 #include <openraster.hpp>
-
-auto read_binary_file(std::string_view path) -> std::vector<uint8_t> {
-  auto file = std::ifstream(std::string{path}, std::ios::binary);
-  return std::vector<uint8_t>(
-    std::istreambuf_iterator<char>(file),
-    std::istreambuf_iterator<char>()
-  );
-}
 
 auto main() -> int {
   auto background = ora::ImageBuffer::make_blank(256, 256, 255);
@@ -132,16 +122,25 @@ auto main() -> int {
     return 1;
   }
 
+  auto background_png = ora::encode_png(*background);
+  if (!background_png) {
+    std::cerr << background_png.error().message << '\n';
+    return 1;
+  }
+
   auto doc = ora::OraDocument{
     .width = 256,
     .height = 256,
     .root_nodes = {ora::layer("background")},
-    .layer_images = {},
-    .merged_image_png = read_binary_file("/abs/path/to/mergedimage.png"),
-    .thumbnail_png = read_binary_file("/abs/path/to/thumbnail.png")
+    .layer_images = {{"background", std::move(*background_png)}},
+    .merged_image_png = std::nullopt,
+    .thumbnail_png = std::nullopt
   };
 
-  doc.layer_images.emplace("background", std::move(*background));
+  if (auto result = ora::render_preview_and_thumbnail(doc); !result) {
+    std::cerr << result.error().message << '\n';
+    return 1;
+  }
 
   if (auto result = ora::write("example.ora", doc); !result) {
     std::cerr << result.error().message << '\n';
@@ -160,8 +159,11 @@ auto main() -> int {
 }
 ```
 
+`OraDocument::layer_images` には各レイヤーの PNG バイト列を設定します。
+RGBA 画像からレイヤーを作る場合は `ora::encode_png()` を使ってください。
+
 `ora::write()` は `mergedimage.png` と `Thumbnails/thumbnail.png` を
-内部生成しません。呼び出し側が OpenRaster 仕様に沿う PNG を用意し、
-`OraDocument` に設定してください。`ora::read()` で読み込んだ
-`OraDocument` をそのまま再書き出しする場合も、必要ならこれらの
-PNG バイト列を補ってから `write()` を呼び出します。
+内部生成しません。必要なら `ora::render_preview_and_thumbnail()` で
+これらの PNG を `OraDocument` に設定してから `write()` を呼び出します。
+`ora::read()` で読み込んだ `OraDocument` をそのまま再書き出しする場合も、
+必要なら preview / thumbnail を補ってから `write()` を呼び出します。

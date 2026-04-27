@@ -1,116 +1,220 @@
 #include "catch2/catch_test_macros.hpp"
+#include "lodepng.h"
 #include "openraster.hpp"
 
 namespace {
 
 struct RecordingProvider {
-    std::map<std::string, std::vector<uint8_t>> written_entries;
-    int encode_png_calls = 0;
+  std::map<std::string, std::vector<uint8_t>> read_entries;
+  std::map<std::string, std::vector<uint8_t>> written_entries;
+  int encode_png_calls = 0;
+  int decode_png_calls = 0;
+  bool fail_decode = false;
+  std::optional<ora::OraDocument> deserialized_doc;
+  std::optional<ora::DecodedImage> decoded_image;
 
-    auto open_archive(std::string_view, ora::ArchiveMode) -> std::expected<void, ora::Error> {
-        return {};
+  auto open_archive(std::string_view, ora::ArchiveMode) -> std::expected<void, ora::Error> {
+    return {};
+  }
+
+  auto close_archive() -> void {}
+
+  auto read_entry(std::string_view path) -> std::expected<std::vector<uint8_t>, ora::Error> {
+    auto const key = std::string{path};
+    if (auto const it = read_entries.find(key); it != read_entries.end()) {
+      return it->second;
     }
+    return std::unexpected(ora::Error{ora::Error::Code::InvalidOraDocument, key});
+  }
 
-    auto close_archive() -> void {}
+  auto write_entry(std::string_view path, std::span<const uint8_t> data, ora::CompressionLevel)
+      -> std::expected<void, ora::Error> {
+    written_entries[std::string{path}] = std::vector<uint8_t>(data.begin(), data.end());
+    return {};
+  }
 
-    auto read_entry(std::string_view) -> std::expected<std::vector<uint8_t>, ora::Error> {
-        return std::unexpected(ora::Error{ora::Error::Code::InvalidOraDocument, "unused"});
+  auto encode_png(std::span<const uint8_t>, unsigned int width, unsigned int height)
+      -> std::expected<std::vector<uint8_t>, ora::Error> {
+    ++encode_png_calls;
+    return std::vector<uint8_t>{
+      0x89,
+      0x50,
+      0x4e,
+      0x47,
+      static_cast<uint8_t>((width >> 8U) & 0xffU),
+      static_cast<uint8_t>(width & 0xffU),
+      static_cast<uint8_t>((height >> 8U) & 0xffU),
+      static_cast<uint8_t>(height & 0xffU)
+    };
+  }
+
+  auto decode_png(std::span<const uint8_t>)
+      -> std::expected<ora::DecodedImage, ora::Error> {
+    ++decode_png_calls;
+    if (fail_decode) {
+      return std::unexpected(ora::Error{
+        ora::Error::Code::PngDecodeFailed,
+        "invalid png"
+      });
     }
-
-    auto write_entry(std::string_view path, std::span<const uint8_t> data, ora::CompressionLevel)
-        -> std::expected<void, ora::Error> {
-        written_entries[std::string{path}] = std::vector<uint8_t>(data.begin(), data.end());
-        return {};
+    if (decoded_image.has_value()) {
+      return *decoded_image;
     }
+    return ora::DecodedImage{
+      .rgba = {255, 0, 0, 255},
+      .width = 1,
+      .height = 1
+    };
+  }
 
-    auto encode_png(std::span<const uint8_t>, unsigned int, unsigned int)
-        -> std::expected<std::vector<uint8_t>, ora::Error> {
-        ++encode_png_calls;
-        return std::vector<uint8_t>{0x89, 0x50, 0x4e, 0x47};
-    }
+  auto serialize_stack(ora::OraDocument const& doc) -> std::string {
+    return "<?xml version='1.0' encoding='UTF-8'?><image version='0.0.5' w='" +
+      std::to_string(doc.width) + "' h='" + std::to_string(doc.height) + "'></image>";
+  }
 
-    auto decode_png(std::span<const uint8_t>)
-        -> std::expected<ora::DecodedImage, ora::Error> {
-        return std::unexpected(ora::Error{ora::Error::Code::PngDecodeFailed, "unused"});
+  auto deserialize_stack(std::span<const uint8_t>)
+      -> std::expected<ora::OraDocument, ora::Error> {
+    if (deserialized_doc.has_value()) {
+      return *deserialized_doc;
     }
-
-    auto serialize_stack(ora::OraDocument const&) -> std::string {
-        return "<?xml version='1.0' encoding='UTF-8'?><image version='0.0.5' w='1' h='1'></image>";
-    }
-
-    auto deserialize_stack(std::span<const uint8_t>)
-        -> std::expected<ora::OraDocument, ora::Error> {
-        return std::unexpected(ora::Error{ora::Error::Code::XmlParseFailed, "unused"});
-    }
+    return std::unexpected(ora::Error{ora::Error::Code::XmlParseFailed, "unused"});
+  }
 };
 
 auto make_test_document() -> ora::OraDocument {
-    return ora::OraDocument{
-        .width = 1,
-        .height = 1,
-        .root_nodes = {},
-        .layer_images = {},
-        .merged_image_png = std::vector<uint8_t>{1, 2, 3, 4},
-        .thumbnail_png = std::vector<uint8_t>{5, 6, 7, 8},
-    };
+  return ora::OraDocument{
+    .width = 1,
+    .height = 1,
+    .root_nodes = {},
+    .layer_images = {},
+    .merged_image_png = std::vector<uint8_t>{1, 2, 3, 4},
+    .thumbnail_png = std::vector<uint8_t>{5, 6, 7, 8},
+  };
+}
+
+auto make_layer_png_bytes(unsigned int width = 1, unsigned int height = 1) -> std::vector<uint8_t> {
+  auto rgba = std::vector<uint8_t>(static_cast<std::size_t>(width) * height * 4U, 0);
+  for (auto index = std::size_t{0}; index < rgba.size(); index += 4U) {
+    rgba[index + 0U] = 32;
+    rgba[index + 1U] = 64;
+    rgba[index + 2U] = 96;
+    rgba[index + 3U] = 255;
+  }
+
+  auto png = std::vector<uint8_t>{};
+  auto const error = lodepng::encode(png, rgba.data(), width, height);
+  REQUIRE(error == 0);
+  return png;
+}
+
+auto make_invalid_png_bytes() -> std::vector<uint8_t> {
+  return {0x00, 0x01, 0x02, 0x03};
+}
+
+auto decode_png_size(std::span<const uint8_t> png_bytes) -> std::pair<unsigned int, unsigned int> {
+  auto rgba = std::vector<uint8_t>{};
+  auto width = 0U;
+  auto height = 0U;
+  auto const error = lodepng::decode(rgba, width, height, png_bytes.data(), png_bytes.size());
+  REQUIRE(error == 0);
+  return {width, height};
+}
+
+auto make_provider_png(unsigned int width, unsigned int height) -> std::vector<uint8_t> {
+  return {
+    0x89,
+    0x50,
+    0x4e,
+    0x47,
+    static_cast<uint8_t>((width >> 8U) & 0xffU),
+    static_cast<uint8_t>(width & 0xffU),
+    static_cast<uint8_t>((height >> 8U) & 0xffU),
+    static_cast<uint8_t>(height & 0xffU)
+  };
 }
 
 } // namespace
 
 TEST_CASE("OraDocument initialization") {
-    ora::OraDocument doc;
-    doc.width = 100;
-    doc.height = 200;
-    
-    SECTION("Empty document") {
-        CHECK(doc.width == 100);
-        CHECK(doc.height == 200);
-        CHECK(doc.root_nodes.empty());
-        CHECK(doc.layer_images.empty());
-        CHECK_FALSE(doc.merged_image_png.has_value());
-        CHECK_FALSE(doc.thumbnail_png.has_value());
-    }
+  auto doc = ora::OraDocument{};
+  doc.width = 100;
+  doc.height = 200;
+
+  SECTION("Empty document") {
+    CHECK(doc.width == 100);
+    CHECK(doc.height == 200);
+    CHECK(doc.root_nodes.empty());
+    CHECK(doc.layer_images.empty());
+    CHECK_FALSE(doc.merged_image_png.has_value());
+    CHECK_FALSE(doc.thumbnail_png.has_value());
+  }
 }
 
 TEST_CASE("ImageBuffer creation") {
-    auto buffer = ora::ImageBuffer::make_blank(10, 10, 255);
-    REQUIRE(buffer.has_value());
-    CHECK(buffer->width() == 10);
-    CHECK(buffer->height() == 10);
-    CHECK(buffer->rgba().size() == 10 * 10 * 4);
-    CHECK(buffer->rgba()[3] == 255); // Alpha channel
+  auto buffer = ora::ImageBuffer::make_blank(10, 10, 255);
+  REQUIRE(buffer.has_value());
+  CHECK(buffer->width() == 10);
+  CHECK(buffer->height() == 10);
+  CHECK(buffer->rgba().size() == 10 * 10 * 4);
+  CHECK(buffer->rgba()[3] == 255);
+}
+
+TEST_CASE("encode_png helper converts ImageBuffer into png bytes", "[png-helper]") {
+  auto provider = RecordingProvider{};
+  auto buffer = ora::ImageBuffer::make_blank(1, 1, 255);
+  REQUIRE(buffer.has_value());
+
+  auto const png = ora::encode_png(provider, *buffer);
+
+  REQUIRE(png.has_value());
+  CHECK(*png == make_provider_png(1, 1));
+  CHECK(provider.encode_png_calls == 1);
+}
+
+TEST_CASE("encode_png helper works with the default provider", "[png-helper]") {
+  auto buffer = ora::ImageBuffer::make_blank(1, 1, 255);
+  REQUIRE(buffer.has_value());
+
+  auto const png = ora::encode_png(*buffer);
+
+  REQUIRE(png.has_value());
+  REQUIRE(png->size() > 8);
+  CHECK((*png)[0] == 0x89);
+  CHECK((*png)[1] == 0x50);
+  CHECK((*png)[2] == 0x4e);
+  CHECK((*png)[3] == 0x47);
 }
 
 TEST_CASE("BlendMode string conversion") {
-    CHECK(ora::to_string(ora::BlendMode::SrcOver) == "svg:src-over");
-    CHECK(ora::from_string("svg:src-over") == ora::BlendMode::SrcOver);
-    CHECK(ora::from_string("invalid") == std::nullopt);
+  CHECK(ora::to_string(ora::BlendMode::SrcOver) == "svg:src-over");
+  CHECK(ora::from_string("svg:src-over") == ora::BlendMode::SrcOver);
+  CHECK(ora::from_string("invalid") == std::nullopt);
 }
 
 TEST_CASE("BlendMode::Hue does not corrupt blue channel") {
-    auto backdrop = ora::ImageBuffer::make_blank(1, 1, 255);
-    REQUIRE(backdrop.has_value());
-    backdrop->rgba_mut()[0] = 255;
-    backdrop->rgba_mut()[1] = 0;
-    backdrop->rgba_mut()[2] = 0;
+  auto backdrop = ora::ImageBuffer::make_blank(1, 1, 255);
+  REQUIRE(backdrop.has_value());
+  backdrop->rgba_mut()[0] = 255;
+  backdrop->rgba_mut()[1] = 0;
+  backdrop->rgba_mut()[2] = 0;
 
-    auto source = ora::ImageBuffer::make_blank(1, 1, 255);
-    REQUIRE(source.has_value());
-    source->rgba_mut()[0] = 0;
-    source->rgba_mut()[1] = 0;
-    source->rgba_mut()[2] = 255;
+  auto source = ora::ImageBuffer::make_blank(1, 1, 255);
+  REQUIRE(source.has_value());
+  source->rgba_mut()[0] = 0;
+  source->rgba_mut()[1] = 0;
+  source->rgba_mut()[2] = 255;
 
-    auto canvas = std::vector<uint8_t>(4, 0);
-    canvas[0] = 255;
-    canvas[3] = 255;
+  auto canvas = std::vector<uint8_t>(4, 0);
+  canvas[0] = 255;
+  canvas[3] = 255;
 
-    ora::detail::blend_layer(canvas, 1, 1, *source, 0, 0, 1.0f, ora::BlendMode::Hue);
+  ora::detail::blend_layer(canvas, 1, 1, *source, 0, 0, 1.0f, ora::BlendMode::Hue);
 
-    CHECK(canvas[0] != canvas[2]);
+  CHECK(canvas[0] != canvas[2]);
 }
 
 TEST_CASE("Nested stacks parse correctly without dangling pointer") {
-    auto const xml = std::string{R"(<?xml version='1.0' encoding='UTF-8'?>
+  auto const xml = std::string{R"(<?xml version='1.0' encoding='UTF-8'?>
 <image version='0.0.5' w='100' h='100'>
   <stack name='group1' composite-op='svg:src-over' opacity='1.0' visibility='visible' x='0' y='0'>
     <layer name='layer1' src='data/layer1.png' composite-op='svg:src-over' opacity='1.0' visibility='visible' x='0' y='0'/>
@@ -124,65 +228,215 @@ TEST_CASE("Nested stacks parse correctly without dangling pointer") {
 </image>
 )"};
 
-    auto const xml_bytes = std::span<const uint8_t>(
-        reinterpret_cast<const uint8_t*>(xml.data()),
-        xml.size());
-    auto const doc = ora::detail::deserialize_stack(xml_bytes);
+  auto const xml_bytes = std::span<const uint8_t>(
+    reinterpret_cast<const uint8_t*>(xml.data()),
+    xml.size()
+  );
+  auto const doc = ora::detail::deserialize_stack(xml_bytes);
 
-    REQUIRE(doc.has_value());
-    REQUIRE(doc->root_nodes.size() == 3);
-    CHECK(doc->root_nodes[0].children.size() == 1);
-    CHECK(doc->root_nodes[1].children.size() == 1);
-    CHECK(doc->root_nodes[2].children.size() == 1);
+  REQUIRE(doc.has_value());
+  REQUIRE(doc->root_nodes.size() == 3);
+  CHECK(doc->root_nodes[0].children.size() == 1);
+  CHECK(doc->root_nodes[1].children.size() == 1);
+  CHECK(doc->root_nodes[2].children.size() == 1);
 }
 
 TEST_CASE("write stores caller-provided merged image and thumbnail bytes", "[write-assets]") {
-    auto provider = RecordingProvider{};
-    auto doc = make_test_document();
+  auto provider = RecordingProvider{};
+  auto doc = make_test_document();
 
-    auto const result = ora::write(provider, "ignored.ora", doc);
+  auto const result = ora::write(provider, "ignored.ora", doc);
 
-    REQUIRE(result.has_value());
-    CHECK(provider.written_entries.at("mergedimage.png") == *doc.merged_image_png);
-    CHECK(provider.written_entries.at("Thumbnails/thumbnail.png") == *doc.thumbnail_png);
-    CHECK(provider.encode_png_calls == 0);
+  REQUIRE(result.has_value());
+  CHECK(provider.written_entries.at("mergedimage.png") == *doc.merged_image_png);
+  CHECK(provider.written_entries.at("Thumbnails/thumbnail.png") == *doc.thumbnail_png);
+  CHECK(provider.encode_png_calls == 0);
 }
 
-TEST_CASE("write still encodes layer images under data/", "[write-assets]") {
-    auto provider = RecordingProvider{};
-    auto doc = make_test_document();
-    auto layer = ora::ImageBuffer::make_blank(1, 1, 255);
-    REQUIRE(layer.has_value());
-    doc.root_nodes.push_back(ora::layer("layer-1"));
-    doc.layer_images.emplace("layer-1", std::move(*layer));
+TEST_CASE("read stores layer images as png bytes", "[png-read]") {
+  auto provider = RecordingProvider{};
+  auto const layer_png = make_layer_png_bytes();
+  provider.read_entries.emplace("mimetype", std::vector<uint8_t>{'i', 'm', 'a', 'g', 'e', '/', 'o', 'p', 'e', 'n', 'r', 'a', 's', 't', 'e', 'r'});
+  provider.read_entries.emplace("stack.xml", std::vector<uint8_t>{'<', 'x', 'm', 'l', '/', '>'});
+  provider.read_entries.emplace("data/layer-1.png", layer_png);
+  provider.deserialized_doc = ora::OraDocument{
+    .width = 1,
+    .height = 1,
+    .root_nodes = {ora::layer("layer-1")},
+    .layer_images = {},
+    .merged_image_png = std::nullopt,
+    .thumbnail_png = std::nullopt,
+  };
 
-    auto const result = ora::write(provider, "ignored.ora", doc);
+  auto const result = ora::read(provider, "ignored.ora");
 
-    REQUIRE(result.has_value());
-    CHECK(provider.written_entries.contains("data/layer-1.png"));
-    CHECK(provider.encode_png_calls == 1);
+  REQUIRE(result.has_value());
+  CHECK(result->layer_images.at("layer-1") == layer_png);
+  CHECK(provider.decode_png_calls == 1);
+}
+
+TEST_CASE("read rejects invalid layer png bytes", "[png-read]") {
+  auto provider = RecordingProvider{};
+  provider.fail_decode = true;
+  provider.read_entries.emplace("mimetype", std::vector<uint8_t>{'i', 'm', 'a', 'g', 'e', '/', 'o', 'p', 'e', 'n', 'r', 'a', 's', 't', 'e', 'r'});
+  provider.read_entries.emplace("stack.xml", std::vector<uint8_t>{'<', 'x', 'm', 'l', '/', '>'});
+  provider.read_entries.emplace("data/layer-1.png", make_invalid_png_bytes());
+  provider.deserialized_doc = ora::OraDocument{
+    .width = 1,
+    .height = 1,
+    .root_nodes = {ora::layer("layer-1")},
+    .layer_images = {},
+    .merged_image_png = std::nullopt,
+    .thumbnail_png = std::nullopt,
+  };
+
+  auto const result = ora::read(provider, "ignored.ora");
+
+  REQUIRE_FALSE(result.has_value());
+  CHECK(result.error().code == ora::Error::Code::PngDecodeFailed);
+}
+
+TEST_CASE("write stores provided layer png bytes under data/", "[png-layer-write]") {
+  auto provider = RecordingProvider{};
+  auto doc = make_test_document();
+  auto const layer_png = make_layer_png_bytes();
+  doc.root_nodes.push_back(ora::layer("layer-1"));
+  doc.layer_images.emplace("layer-1", layer_png);
+
+  auto const result = ora::write(provider, "ignored.ora", doc);
+
+  REQUIRE(result.has_value());
+  CHECK(provider.written_entries.at("data/layer-1.png") == layer_png);
+  CHECK(provider.encode_png_calls == 0);
 }
 
 TEST_CASE("write rejects missing caller-provided render assets", "[write-assets]") {
-    auto provider = RecordingProvider{};
+  auto provider = RecordingProvider{};
 
-    SECTION("missing thumbnail") {
-        auto doc = make_test_document();
-        doc.thumbnail_png.reset();
+  SECTION("missing thumbnail") {
+    auto doc = make_test_document();
+    doc.thumbnail_png.reset();
 
-        auto const result = ora::write(provider, "ignored.ora", doc);
+    auto const result = ora::write(provider, "ignored.ora", doc);
 
-        REQUIRE_FALSE(result.has_value());
-        CHECK(result.error().code == ora::Error::Code::InvalidOraDocument);
-    }
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().code == ora::Error::Code::InvalidOraDocument);
+  }
 
-    SECTION("missing merged image") {
-        auto doc = make_test_document();
-        doc.merged_image_png.reset();
+  SECTION("missing merged image") {
+    auto doc = make_test_document();
+    doc.merged_image_png.reset();
 
-        auto const result = ora::write(provider, "ignored.ora", doc);
+    auto const result = ora::write(provider, "ignored.ora", doc);
 
-        REQUIRE_FALSE(result.has_value());
-        CHECK(result.error().code == ora::Error::Code::InvalidOraDocument);
-    }
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().code == ora::Error::Code::InvalidOraDocument);
+  }
+}
+
+TEST_CASE("render_preview_and_thumbnail sets preview assets on OraDocument", "[render-helper]") {
+  auto provider = RecordingProvider{};
+  auto doc = ora::OraDocument{
+    .width = 2,
+    .height = 1,
+    .root_nodes = {ora::layer("layer-1")},
+    .layer_images = {{"layer-1", make_layer_png_bytes()}},
+    .merged_image_png = std::nullopt,
+    .thumbnail_png = std::nullopt,
+  };
+
+  auto const result = ora::render_preview_and_thumbnail(provider, doc);
+
+  REQUIRE(result.has_value());
+  CHECK(doc.merged_image_png == make_provider_png(2, 1));
+  CHECK(doc.thumbnail_png == make_provider_png(2, 1));
+  CHECK(provider.decode_png_calls == 1);
+  CHECK(provider.encode_png_calls == 2);
+}
+
+TEST_CASE("encode_png helper works with the default provider wrapper", "[png-helper]") {
+  auto buffer = ora::ImageBuffer::make_blank(2, 1, 255);
+  REQUIRE(buffer.has_value());
+
+  auto const png = ora::encode_png(*buffer);
+
+  REQUIRE(png.has_value());
+  CHECK(decode_png_size(*png) == std::pair<unsigned int, unsigned int>{2, 1});
+}
+
+TEST_CASE("render_preview_and_thumbnail works with the default provider", "[render-helper]") {
+  auto doc = ora::OraDocument{
+    .width = 2,
+    .height = 1,
+    .root_nodes = {ora::layer("layer-1")},
+    .layer_images = {{"layer-1", make_layer_png_bytes(2, 1)}},
+    .merged_image_png = std::nullopt,
+    .thumbnail_png = std::nullopt,
+  };
+
+  auto const result = ora::render_preview_and_thumbnail(doc);
+
+  REQUIRE(result.has_value());
+  REQUIRE(doc.merged_image_png.has_value());
+  REQUIRE(doc.thumbnail_png.has_value());
+  CHECK(decode_png_size(*doc.merged_image_png) == std::pair<unsigned int, unsigned int>{2, 1});
+  CHECK(decode_png_size(*doc.thumbnail_png) == std::pair<unsigned int, unsigned int>{2, 1});
+}
+
+TEST_CASE("render_preview_and_thumbnail rejects zero-sized documents", "[render-helper]") {
+  auto provider = RecordingProvider{};
+  auto doc = ora::OraDocument{
+    .width = 0,
+    .height = 1,
+    .root_nodes = {},
+    .layer_images = {},
+    .merged_image_png = std::nullopt,
+    .thumbnail_png = std::nullopt,
+  };
+
+  auto const result = ora::render_preview_and_thumbnail(provider, doc);
+
+  REQUIRE_FALSE(result.has_value());
+  CHECK(result.error().code == ora::Error::Code::InvalidOraDocument);
+}
+
+TEST_CASE("render_preview_and_thumbnail rejects invalid layer png bytes", "[render-helper]") {
+  auto provider = RecordingProvider{};
+  provider.fail_decode = true;
+  auto doc = ora::OraDocument{
+    .width = 1,
+    .height = 1,
+    .root_nodes = {ora::layer("layer-1")},
+    .layer_images = {{"layer-1", make_invalid_png_bytes()}},
+    .merged_image_png = std::nullopt,
+    .thumbnail_png = std::nullopt,
+  };
+
+  auto const result = ora::render_preview_and_thumbnail(provider, doc);
+
+  REQUIRE_FALSE(result.has_value());
+  CHECK(result.error().code == ora::Error::Code::PngDecodeFailed);
+}
+
+TEST_CASE("render_preview_and_thumbnail preserves aspect ratio within 256px", "[render-helper]") {
+  auto provider = RecordingProvider{};
+  provider.decoded_image = ora::DecodedImage{
+    .rgba = std::vector<uint8_t>(static_cast<std::size_t>(300) * 150U * 4U, 255),
+    .width = 300,
+    .height = 150
+  };
+  auto doc = ora::OraDocument{
+    .width = 300,
+    .height = 150,
+    .root_nodes = {ora::layer("layer-1")},
+    .layer_images = {{"layer-1", make_layer_png_bytes()}},
+    .merged_image_png = std::nullopt,
+    .thumbnail_png = std::nullopt,
+  };
+
+  auto const result = ora::render_preview_and_thumbnail(provider, doc);
+
+  REQUIRE(result.has_value());
+  CHECK(doc.merged_image_png == make_provider_png(300, 150));
+  CHECK(doc.thumbnail_png == make_provider_png(256, 128));
 }
