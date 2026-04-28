@@ -107,17 +107,6 @@ public:
   static auto create(unsigned int width, unsigned int height, std::vector<uint8_t> rgba)
       -> std::expected<ImageBuffer, Error>;
 
-  /**
-   * @brief ゼロ初期化済みバッファを生成するファクトリ
-   * @param width 画像の幅（ピクセル）です。
-   * @param height 画像の高さ（ピクセル）です。
-   * @param alpha 各ピクセルへ設定する初期アルファ値です。
-   * @return 生成した空画像、寸法が不正な場合はエラーを返します。
-   */
-  [[nodiscard]]
-  static auto make_blank(unsigned int width, unsigned int height, uint8_t alpha = 0)
-      -> std::expected<ImageBuffer, Error>;
-
   ImageBuffer(const ImageBuffer&) = default;
   ImageBuffer(ImageBuffer&&) noexcept = default;
   auto operator=(const ImageBuffer&) -> ImageBuffer& = default;
@@ -333,6 +322,19 @@ auto process_blend(std::vector<uint8_t>& canvas, unsigned int cw, unsigned int c
 
 } // namespace detail
 
+namespace util {
+
+/**
+ * @brief ゼロ初期化済みの `ImageBuffer` を生成します。
+ * @param width 画像の幅（ピクセル）です。
+ * @param height 画像の高さ（ピクセル）です。
+ * @param alpha 各ピクセルへ設定する初期アルファ値です。
+ * @return 生成した空画像、寸法が不正な場合はエラーを返します。
+ */
+[[nodiscard]]
+auto blank_image(unsigned int width, unsigned int height, uint8_t alpha = 0)
+    -> std::expected<ImageBuffer, Error>;
+
 /**
  * @brief Provider を使って `ImageBuffer` を PNG バイト列へ変換します。
  * @tparam Provider `OraProvider` を満たす実装型です。
@@ -409,6 +411,23 @@ auto render_preview_and_thumbnail(Provider& provider, OraDocument& doc)
   doc.thumbnail_png = std::move(*thumb_png);
   return {};
 }
+
+/**
+ * @brief ImageBuffer を PNG バイト列へ変換します。
+ * @param image 変換対象の画像です。
+ * @return PNG バイト列、失敗時はエラーを返します。
+ */
+[[nodiscard]]
+auto encode_png(const ImageBuffer& image) -> std::expected<std::vector<uint8_t>, Error>;
+
+/**
+ * @brief レイヤー PNG から mergedimage / thumbnail を生成して doc に設定します。
+ * @param doc 画像を追加設定する対象ドキュメントです。
+ * @return 生成に成功した場合は空の `expected`、失敗時はエラーを返します。
+ */
+auto render_preview_and_thumbnail(OraDocument& doc) -> std::expected<void, Error>;
+
+} // namespace util
 
 /**
  * @brief OpenRasterファイルの読み込み
@@ -505,21 +524,6 @@ class DefaultOraProvider;
  */
 [[nodiscard]]
 auto read(std::string_view filename) -> std::expected<OraDocument, Error>;
-
-/**
- * @brief ImageBuffer を PNG バイト列へ変換
- * @param image 変換対象の画像です。
- * @return PNG バイト列、失敗時はエラーを返します。
- */
-[[nodiscard]]
-auto encode_png(const ImageBuffer& image) -> std::expected<std::vector<uint8_t>, Error>;
-
-/**
- * @brief レイヤー PNG から mergedimage / thumbnail を生成して doc に設定
- * @param doc 画像を追加設定する対象ドキュメントです。
- * @return 生成に成功した場合は空の `expected`、失敗時はエラーを返します。
- */
-auto render_preview_and_thumbnail(OraDocument& doc) -> std::expected<void, Error>;
 
 /**
  * @brief デフォルトプロバイダを使用した書き込み（後方互換用）

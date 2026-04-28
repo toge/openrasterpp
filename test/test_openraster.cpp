@@ -151,7 +151,7 @@ TEST_CASE("OraDocument initialization") {
 }
 
 TEST_CASE("ImageBuffer creation") {
-  auto buffer = ora::ImageBuffer::make_blank(10, 10, 255);
+  auto buffer = ora::util::blank_image(10, 10, 255);
   REQUIRE(buffer.has_value());
   CHECK(buffer->width() == 10);
   CHECK(buffer->height() == 10);
@@ -161,10 +161,10 @@ TEST_CASE("ImageBuffer creation") {
 
 TEST_CASE("encode_png helper converts ImageBuffer into png bytes", "[png-helper]") {
   auto provider = RecordingProvider{};
-  auto buffer = ora::ImageBuffer::make_blank(1, 1, 255);
+  auto buffer = ora::util::blank_image(1, 1, 255);
   REQUIRE(buffer.has_value());
 
-  auto const png = ora::encode_png(provider, *buffer);
+  auto const png = ora::util::encode_png(provider, *buffer);
 
   REQUIRE(png.has_value());
   CHECK(*png == make_provider_png(1, 1));
@@ -172,10 +172,10 @@ TEST_CASE("encode_png helper converts ImageBuffer into png bytes", "[png-helper]
 }
 
 TEST_CASE("encode_png helper works with the default provider", "[png-helper]") {
-  auto buffer = ora::ImageBuffer::make_blank(1, 1, 255);
+  auto buffer = ora::util::blank_image(1, 1, 255);
   REQUIRE(buffer.has_value());
 
-  auto const png = ora::encode_png(*buffer);
+  auto const png = ora::util::encode_png(*buffer);
 
   REQUIRE(png.has_value());
   REQUIRE(png->size() > 8);
@@ -192,13 +192,13 @@ TEST_CASE("BlendMode string conversion") {
 }
 
 TEST_CASE("BlendMode::Hue does not corrupt blue channel") {
-  auto backdrop = ora::ImageBuffer::make_blank(1, 1, 255);
+  auto backdrop = ora::util::blank_image(1, 1, 255);
   REQUIRE(backdrop.has_value());
   backdrop->rgba_mut()[0] = 255;
   backdrop->rgba_mut()[1] = 0;
   backdrop->rgba_mut()[2] = 0;
 
-  auto source = ora::ImageBuffer::make_blank(1, 1, 255);
+  auto source = ora::util::blank_image(1, 1, 255);
   REQUIRE(source.has_value());
   source->rgba_mut()[0] = 0;
   source->rgba_mut()[1] = 0;
@@ -345,7 +345,7 @@ TEST_CASE("render_preview_and_thumbnail sets preview assets on OraDocument", "[r
     .thumbnail_png = std::nullopt,
   };
 
-  auto const result = ora::render_preview_and_thumbnail(provider, doc);
+  auto const result = ora::util::render_preview_and_thumbnail(provider, doc);
 
   REQUIRE(result.has_value());
   CHECK(doc.merged_image_png == make_provider_png(2, 1));
@@ -355,10 +355,10 @@ TEST_CASE("render_preview_and_thumbnail sets preview assets on OraDocument", "[r
 }
 
 TEST_CASE("encode_png helper works with the default provider wrapper", "[png-helper]") {
-  auto buffer = ora::ImageBuffer::make_blank(2, 1, 255);
+  auto buffer = ora::util::blank_image(2, 1, 255);
   REQUIRE(buffer.has_value());
 
-  auto const png = ora::encode_png(*buffer);
+  auto const png = ora::util::encode_png(*buffer);
 
   REQUIRE(png.has_value());
   CHECK(decode_png_size(*png) == std::pair<unsigned int, unsigned int>{2, 1});
@@ -374,7 +374,7 @@ TEST_CASE("render_preview_and_thumbnail works with the default provider", "[rend
     .thumbnail_png = std::nullopt,
   };
 
-  auto const result = ora::render_preview_and_thumbnail(doc);
+  auto const result = ora::util::render_preview_and_thumbnail(doc);
 
   REQUIRE(result.has_value());
   REQUIRE(doc.merged_image_png.has_value());
@@ -394,7 +394,7 @@ TEST_CASE("render_preview_and_thumbnail rejects zero-sized documents", "[render-
     .thumbnail_png = std::nullopt,
   };
 
-  auto const result = ora::render_preview_and_thumbnail(provider, doc);
+  auto const result = ora::util::render_preview_and_thumbnail(provider, doc);
 
   REQUIRE_FALSE(result.has_value());
   CHECK(result.error().code == ora::Error::Code::InvalidOraDocument);
@@ -412,7 +412,7 @@ TEST_CASE("render_preview_and_thumbnail rejects invalid layer png bytes", "[rend
     .thumbnail_png = std::nullopt,
   };
 
-  auto const result = ora::render_preview_and_thumbnail(provider, doc);
+  auto const result = ora::util::render_preview_and_thumbnail(provider, doc);
 
   REQUIRE_FALSE(result.has_value());
   CHECK(result.error().code == ora::Error::Code::PngDecodeFailed);
@@ -434,7 +434,7 @@ TEST_CASE("render_preview_and_thumbnail preserves aspect ratio within 256px", "[
     .thumbnail_png = std::nullopt,
   };
 
-  auto const result = ora::render_preview_and_thumbnail(provider, doc);
+  auto const result = ora::util::render_preview_and_thumbnail(provider, doc);
 
   REQUIRE(result.has_value());
   CHECK(doc.merged_image_png == make_provider_png(300, 150));

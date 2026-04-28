@@ -632,12 +632,15 @@ auto ImageBuffer::create(unsigned int w, unsigned int h, std::vector<uint8_t> rg
  * @param a 初期アルファ値です。
  * @return 生成した空画像、失敗時はエラーを返します。
  */
-auto ImageBuffer::make_blank(unsigned int w, unsigned int h, uint8_t a) -> std::expected<ImageBuffer, Error> {
-  if (w==0 || h==0) return detail::make_unexpected(Error::Code::InvalidImageBuffer, "invalid dimensions");
+namespace util {
+
+auto blank_image(unsigned int w, unsigned int h, uint8_t a) -> std::expected<ImageBuffer, Error> {
   std::vector<uint8_t> rgba(static_cast<size_t>(w)*h*4, 0);
   if (a!=0) for (size_t i=3; i<rgba.size(); i+=4) rgba[i]=a;
-  return ImageBuffer(w, h, std::move(rgba));
+  return ImageBuffer::create(w, h, std::move(rgba));
 }
+
+} // namespace util
 
 /**
  * @brief `BlendMode` を OpenRaster の属性文字列へ変換します。
@@ -662,7 +665,7 @@ auto to_string(BlendMode m) -> std::string_view {
  */
 auto from_string(std::string_view sv) -> std::optional<BlendMode> {
   for (int i=0; i<=static_cast<int>(BlendMode::DstAtop); ++i) {
-    auto m = static_cast<BlendMode>(i); if (to_string(m) == sv) return m;
+    auto m = static_cast<BlendMode>(i); if (::ora::to_string(m) == sv) return m;
   }
   return std::nullopt;
 }
@@ -682,6 +685,8 @@ auto read(std::string_view filename) -> std::expected<OraDocument, Error> {
  * @param image 変換対象画像です。
  * @return PNG バイト列、失敗時はエラーを返します。
  */
+namespace util {
+
 auto encode_png(const ImageBuffer& image) -> std::expected<std::vector<uint8_t>, Error> {
   DefaultOraProvider provider;
   return encode_png(provider, image);
@@ -696,6 +701,8 @@ auto render_preview_and_thumbnail(OraDocument& doc) -> std::expected<void, Error
   DefaultOraProvider provider;
   return render_preview_and_thumbnail(provider, doc);
 }
+
+} // namespace util
 
 /**
  * @brief 既定 Provider で ORA ドキュメントを書き込みます。

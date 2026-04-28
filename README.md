@@ -1,6 +1,6 @@
 # openrasterpp
 
-`openrasterpp` は、OpenRaster（`.ora`）ドキュメントを読み書きするための C++26 ライブラリです。  
+`openrasterpp` は、OpenRaster（`.ora`）ドキュメントを読み書きするための C++26 ライブラリです。
 レイヤー構造、ブレンドモード、PNG 画像データ、ZIP ベースの OpenRaster アーカイブを扱うための API を提供します。
 
 ## 概要
@@ -13,6 +13,23 @@
 - `ora::read` / `ora::write`: `.ora` ファイルの読み書き
 
 既定のプロバイダを使う簡易 API に加えて、アーカイブ処理・PNG エンコード/デコード・`stack.xml` の処理を差し替えられる provider 抽象化も含まれています。
+
+## API構成
+
+このライブラリの公開 API は、主に次の 2 層に分かれています。
+
+- `namespace ora`
+  - ドメインモデルと入出力の主 API です。
+  - `ora::OraDocument`、`ora::Node`、`ora::ImageBuffer`
+  - `ora::read()` / `ora::write()`
+  - `ora::layer()` / `ora::stack()`
+- `namespace ora::util`
+  - `ora` の主 API を補助する helper 群です。
+  - `ora::util::blank_image()`
+  - `ora::util::encode_png()`
+  - `ora::util::render_preview_and_thumbnail()`
+
+通常は `ora` 直下の型と入出力 API を中心に使い、画像生成や PNG 化、preview / thumbnail の補完が必要な場面で `ora::util` を併用します。
 
 ## 主な機能
 
@@ -36,7 +53,7 @@
 
 ## ビルド方法
 
-このリポジトリでは、依存ライブラリを CMake から見つけられる状態にしてからビルドします。  
+このリポジトリでは、依存ライブラリを CMake から見つけられる状態にしてからビルドします。
 ローカル検証例では、`vcpkg_installed/x64-linux` を `CMAKE_PREFIX_PATH` に渡す方法を使っています。
 
 ```bash
@@ -69,7 +86,7 @@ ctest --test-dir build -V
 sh ./test.sh
 ```
 
-`test.sh` は `cmake --install` 後に `test/install_smoke` をビルドし、`find_package(openrasterpp CONFIG REQUIRED)` による下流利用を確認します。  
+`test.sh` は `cmake --install` 後に `test/install_smoke` をビルドし、`find_package(openrasterpp CONFIG REQUIRED)` による下流利用を確認します。
 このスクリプトは既定ではリポジトリ直下の `vcpkg_installed/x64-linux` を依存プレフィックスとして参照します。
 
 ## インストールと利用方法
@@ -89,7 +106,7 @@ add_executable(my_app main.cpp)
 target_link_libraries(my_app PRIVATE openrasterpp::openrasterpp)
 ```
 
-`openrasterpp` 自体だけでなく、その依存ライブラリも CMake から見つけられる必要があります。  
+`openrasterpp` 自体だけでなく、その依存ライブラリも CMake から見つけられる必要があります。
 そのため、下流プロジェクトでは `CMAKE_PREFIX_PATH` に `openrasterpp` の install prefix と依存ライブラリの prefix を含めてください。
 
 ```bash
@@ -116,13 +133,13 @@ cmake -S test/install_smoke -B build/install-smoke \
 #include <openraster.hpp>
 
 auto main() -> int {
-  auto background = ora::ImageBuffer::make_blank(256, 256, 255);
+  auto background = ora::util::blank_image(256, 256, 255);
   if (!background) {
     std::cerr << background.error().message << '\n';
     return 1;
   }
 
-  auto background_png = ora::encode_png(*background);
+  auto background_png = ora::util::encode_png(*background);
   if (!background_png) {
     std::cerr << background_png.error().message << '\n';
     return 1;
@@ -137,7 +154,7 @@ auto main() -> int {
     .thumbnail_png = std::nullopt
   };
 
-  if (auto result = ora::render_preview_and_thumbnail(doc); !result) {
+  if (auto result = ora::util::render_preview_and_thumbnail(doc); !result) {
     std::cerr << result.error().message << '\n';
     return 1;
   }
@@ -159,11 +176,14 @@ auto main() -> int {
 }
 ```
 
+この例では、ドキュメントの読み書きは `ora`、補助的な画像生成と PNG 変換は `ora::util` を使っています。
+
 `OraDocument::layer_images` には各レイヤーの PNG バイト列を設定します。
-RGBA 画像からレイヤーを作る場合は `ora::encode_png()` を使ってください。
+空の `ImageBuffer` が必要な場合は `ora::util::blank_image()` を使えます。
+RGBA 画像からレイヤーを作る場合は `ora::util::encode_png()` を使ってください。
 
 `ora::write()` は `mergedimage.png` と `Thumbnails/thumbnail.png` を
-内部生成しません。必要なら `ora::render_preview_and_thumbnail()` で
+内部生成しません。必要なら `ora::util::render_preview_and_thumbnail()` で
 これらの PNG を `OraDocument` に設定してから `write()` を呼び出します。
 `ora::read()` で読み込んだ `OraDocument` をそのまま再書き出しする場合も、
 必要なら preview / thumbnail を補ってから `write()` を呼び出します。
