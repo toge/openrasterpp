@@ -1,5 +1,4 @@
 #include "catch2/catch_test_macros.hpp"
-#include "lodepng.h"
 #include "openraster.hpp"
 
 namespace {
@@ -92,32 +91,8 @@ auto make_test_document() -> ora::OraDocument {
   };
 }
 
-auto make_layer_png_bytes(unsigned int width = 1, unsigned int height = 1) -> std::vector<uint8_t> {
-  auto rgba = std::vector<uint8_t>(static_cast<std::size_t>(width) * height * 4U, 0);
-  for (auto index = std::size_t{0}; index < rgba.size(); index += 4U) {
-    rgba[index + 0U] = 32;
-    rgba[index + 1U] = 64;
-    rgba[index + 2U] = 96;
-    rgba[index + 3U] = 255;
-  }
-
-  auto png = std::vector<uint8_t>{};
-  auto const error = lodepng::encode(png, rgba.data(), width, height);
-  REQUIRE(error == 0);
-  return png;
-}
-
 auto make_invalid_png_bytes() -> std::vector<uint8_t> {
   return {0x00, 0x01, 0x02, 0x03};
-}
-
-auto decode_png_size(std::span<const uint8_t> png_bytes) -> std::pair<unsigned int, unsigned int> {
-  auto rgba = std::vector<uint8_t>{};
-  auto width = 0U;
-  auto height = 0U;
-  auto const error = lodepng::decode(rgba, width, height, png_bytes.data(), png_bytes.size());
-  REQUIRE(error == 0);
-  return {width, height};
 }
 
 auto make_provider_png(unsigned int width, unsigned int height) -> std::vector<uint8_t> {
@@ -169,20 +144,6 @@ TEST_CASE("encode_png helper converts ImageBuffer into png bytes", "[png-helper]
   REQUIRE(png.has_value());
   CHECK(*png == make_provider_png(1, 1));
   CHECK(provider.encode_png_calls == 1);
-}
-
-TEST_CASE("encode_png helper works with the default provider", "[png-helper]") {
-  auto buffer = ora::util::blank_image(1, 1, 255);
-  REQUIRE(buffer.has_value());
-
-  auto const png = ora::util::encode_png(*buffer);
-
-  REQUIRE(png.has_value());
-  REQUIRE(png->size() > 8);
-  CHECK((*png)[0] == 0x89);
-  CHECK((*png)[1] == 0x50);
-  CHECK((*png)[2] == 0x4e);
-  CHECK((*png)[3] == 0x47);
 }
 
 TEST_CASE("BlendMode string conversion") {
@@ -255,7 +216,7 @@ TEST_CASE("write stores caller-provided merged image and thumbnail bytes", "[wri
 
 TEST_CASE("read stores layer images as png bytes", "[png-read]") {
   auto provider = RecordingProvider{};
-  auto const layer_png = make_layer_png_bytes();
+  auto const layer_png = make_provider_png(1, 1);
   provider.read_entries.emplace("mimetype", std::vector<uint8_t>{'i', 'm', 'a', 'g', 'e', '/', 'o', 'p', 'e', 'n', 'r', 'a', 's', 't', 'e', 'r'});
   provider.read_entries.emplace("stack.xml", std::vector<uint8_t>{'<', 'x', 'm', 'l', '/', '>'});
   provider.read_entries.emplace("data/layer-1.png", layer_png);
@@ -299,7 +260,7 @@ TEST_CASE("read rejects invalid layer png bytes", "[png-read]") {
 TEST_CASE("write stores provided layer png bytes under data/", "[png-layer-write]") {
   auto provider = RecordingProvider{};
   auto doc = make_test_document();
-  auto const layer_png = make_layer_png_bytes();
+  auto const layer_png = make_provider_png(1, 1);
   doc.root_nodes.push_back(ora::layer("layer-1"));
   doc.layer_images.emplace("layer-1", layer_png);
 
@@ -340,7 +301,7 @@ TEST_CASE("render_preview_and_thumbnail sets preview assets on OraDocument", "[r
     .width = 2,
     .height = 1,
     .root_nodes = {ora::layer("layer-1")},
-    .layer_images = {{"layer-1", make_layer_png_bytes()}},
+    .layer_images = {{"layer-1", make_provider_png(1, 1)}},
     .merged_image_png = std::nullopt,
     .thumbnail_png = std::nullopt,
   };
@@ -352,35 +313,6 @@ TEST_CASE("render_preview_and_thumbnail sets preview assets on OraDocument", "[r
   CHECK(doc.thumbnail_png == make_provider_png(2, 1));
   CHECK(provider.decode_png_calls == 1);
   CHECK(provider.encode_png_calls == 2);
-}
-
-TEST_CASE("encode_png helper works with the default provider wrapper", "[png-helper]") {
-  auto buffer = ora::util::blank_image(2, 1, 255);
-  REQUIRE(buffer.has_value());
-
-  auto const png = ora::util::encode_png(*buffer);
-
-  REQUIRE(png.has_value());
-  CHECK(decode_png_size(*png) == std::pair<unsigned int, unsigned int>{2, 1});
-}
-
-TEST_CASE("render_preview_and_thumbnail works with the default provider", "[render-helper]") {
-  auto doc = ora::OraDocument{
-    .width = 2,
-    .height = 1,
-    .root_nodes = {ora::layer("layer-1")},
-    .layer_images = {{"layer-1", make_layer_png_bytes(2, 1)}},
-    .merged_image_png = std::nullopt,
-    .thumbnail_png = std::nullopt,
-  };
-
-  auto const result = ora::util::render_preview_and_thumbnail(doc);
-
-  REQUIRE(result.has_value());
-  REQUIRE(doc.merged_image_png.has_value());
-  REQUIRE(doc.thumbnail_png.has_value());
-  CHECK(decode_png_size(*doc.merged_image_png) == std::pair<unsigned int, unsigned int>{2, 1});
-  CHECK(decode_png_size(*doc.thumbnail_png) == std::pair<unsigned int, unsigned int>{2, 1});
 }
 
 TEST_CASE("render_preview_and_thumbnail rejects zero-sized documents", "[render-helper]") {
@@ -429,7 +361,7 @@ TEST_CASE("render_preview_and_thumbnail preserves aspect ratio within 256px", "[
     .width = 300,
     .height = 150,
     .root_nodes = {ora::layer("layer-1")},
-    .layer_images = {{"layer-1", make_layer_png_bytes()}},
+    .layer_images = {{"layer-1", make_provider_png(1, 1)}},
     .merged_image_png = std::nullopt,
     .thumbnail_png = std::nullopt,
   };

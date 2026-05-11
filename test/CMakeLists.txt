@@ -1,15 +1,25 @@
 find_package(Catch2 REQUIRED CONFIG)
 
-file(GLOB test_src test_*.cpp)
+if(NOT TARGET openrasterpp-core)
+  add_library(openrasterpp-core ALIAS openrasterpp)
+endif()
 
-add_executable(all_test ${test_src})
+if(NOT TARGET openrasterpp-png-lodepng)
+  add_library(openrasterpp-png-lodepng ALIAS openrasterpp)
+endif()
 
-target_link_libraries(all_test PRIVATE 
-    openrasterpp
-    Catch2::Catch2WithMain
+add_executable(core_test test_openraster.cpp)
+target_link_libraries(core_test PRIVATE
+  openrasterpp-core
+  Catch2::Catch2WithMain
 )
+target_compile_features(core_test PRIVATE cxx_std_26)
+add_test(NAME core_test COMMAND core_test)
 
-target_include_directories(all_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_compile_features(all_test PRIVATE cxx_std_26)
-
-add_test(NAME all_test COMMAND all_test)
+add_executable(lodepng_backend_test test_lodepng_backend.cpp)
+target_link_libraries(lodepng_backend_test PRIVATE
+  openrasterpp-png-lodepng
+  Catch2::Catch2WithMain
+)
+target_compile_features(lodepng_backend_test PRIVATE cxx_std_26)
+add_test(NAME lodepng_backend_test COMMAND lodepng_backend_test)

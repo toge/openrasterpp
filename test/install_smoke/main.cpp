@@ -1,6 +1,11 @@
-#include <openraster.hpp>
+#include <openraster_lodepng.hpp>
 
 auto main() -> int {
-  auto const mode = ora::to_string(ora::BlendMode::SrcOver);
-  return mode == "svg:src-over" ? 0 : 1;
+  auto image = ora::util::blank_image(1, 1, 255);
+  if (!image.has_value()) {
+    return 1;
+  }
+
+  auto png = ora::lodepng::encode_png(*image);
+  return png.has_value() && png->size() > 8 ? 0 : 1;
 }
