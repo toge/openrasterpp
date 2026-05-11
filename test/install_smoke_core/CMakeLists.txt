@@ -11,3 +11,7 @@ get_target_property(core_links openrasterpp::openrasterpp-core INTERFACE_LINK_LI
 if(core_links MATCHES "lodepng")
   message(FATAL_ERROR "openrasterpp-core must not leak lodepng")
 endif()
+
+if(TARGET lodepng)
+  message(FATAL_ERROR "core component must not resolve lodepng")
+endif()

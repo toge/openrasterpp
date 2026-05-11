@@ -1,60 +1,53 @@
 # openrasterpp
 
-`openrasterpp` は、OpenRaster（`.ora`）ドキュメントを読み書きするための C++26 ライブラリです。
-レイヤー構造、ブレンドモード、PNG 画像データ、ZIP ベースの OpenRaster アーカイブを扱うための API を提供します。
+`openrasterpp` は OpenRaster（`.ora`）ドキュメントを扱う C++26 ライブラリです。  
+現在は **core + PNG backend target 分離** 構成です。
 
-## 概要
+## ターゲット構成
 
-このライブラリは、OpenRaster ドキュメントを次のような構成要素で表現します。
+- `openrasterpp::openrasterpp-core`
+  - ORA モデル
+  - `stack.xml` の parse/serialize
+  - ZIP/package 処理
+  - provider/concept ベースの read/write フロー
+  - PNG 実装ライブラリへの直接依存なし
+- `openrasterpp::openrasterpp-png-lodepng`
+  - lodepng を使う PNG backend
+  - `ora::lodepng::*` façade API を提供
 
-- `ora::OraDocument`: ドキュメント全体
-- `ora::Node`: レイヤーまたはスタック（グループ）
-- `ora::ImageBuffer`: RGBA 画像データ
-- `ora::read` / `ora::write`: `.ora` ファイルの読み書き
+## 公開 API
 
-既定のプロバイダを使う簡易 API に加えて、アーカイブ処理・PNG エンコード/デコード・`stack.xml` の処理を差し替えられる provider 抽象化も含まれています。
+### Core API（backend 非依存）
 
-## API構成
+- `ora::OraDocument`
+- `ora::Node`
+- `ora::ImageBuffer`
+- `ora::read(provider, ...)`
+- `ora::write(provider, ...)`
+- `ora::util::encode_png(provider, ...)`
+- `ora::util::render_preview_and_thumbnail(provider, ...)`
 
-このライブラリの公開 API は、主に次の 2 層に分かれています。
+### lodepng backend API（backend 明示）
 
-- `namespace ora`
-  - ドメインモデルと入出力の主 API です。
-  - `ora::OraDocument`、`ora::Node`、`ora::ImageBuffer`
-  - `ora::read()` / `ora::write()`
-  - `ora::layer()` / `ora::stack()`
-- `namespace ora::util`
-  - `ora` の主 API を補助する helper 群です。
-  - `ora::util::blank_image()`
-  - `ora::util::encode_png()`
-  - `ora::util::render_preview_and_thumbnail()`
-
-通常は `ora` 直下の型と入出力 API を中心に使い、画像生成や PNG 化、preview / thumbnail の補完が必要な場面で `ora::util` を併用します。
-
-## 主な機能
-
-- OpenRaster（`.ora`）ファイルの読み込み
-- OpenRaster（`.ora`）ファイルの書き込み
-- レイヤー / スタック構造の表現
-- OpenRaster のブレンドモード文字列と列挙値の相互変換
-- `find_package(openrasterpp CONFIG REQUIRED)` で利用できる CMake package export
+- `#include <openraster_lodepng.hpp>`
+- `ora::lodepng::read(...)`
+- `ora::lodepng::write(...)`
+- `ora::lodepng::encode_png(...)`
+- `ora::lodepng::render_preview_and_thumbnail(...)`
 
 ## 必要要件
 
-- CMake 3.25 以上
-- C++26 に対応したコンパイラ
+- CMake 3.25+
+- C++26 compiler
 - `std::expected` を含む標準ライブラリ実装
 
 ## 依存関係
 
-- `minizip-ng`
-- `lodepng`
-- `Catch2`（テスト時のみ）
+- core: `minizip-ng`
+- backend (`png-lodepng`): `lodepng`
+- test: `Catch2`
 
-## ビルド方法
-
-このリポジトリでは、依存ライブラリを CMake から見つけられる状態にしてからビルドします。
-ローカル検証例では、`vcpkg_installed/x64-linux` を `CMAKE_PREFIX_PATH` に渡す方法を使っています。
+## ビルド
 
 ```bash
 cmake -S . -B build \
@@ -64,73 +57,51 @@ cmake -S . -B build \
 cmake --build build --parallel 4
 ```
 
-補助スクリプトもあります。
-
-```bash
-sh ./build.sh
-```
-
-ただし `build.sh` は環境に応じて Conan / vcpkg の経路を使うため、依存解決方法が環境に合っていることを前提にしてください。
-
-## テスト方法
-
-まず通常の CTest を実行できます。
+## テスト
 
 ```bash
 ctest --test-dir build -V
-```
-
-インストール済み package を使った smoke test まで含める場合は、次の補助スクリプトを使えます。
-
-```bash
 sh ./test.sh
 ```
 
-`test.sh` は `cmake --install` 後に `test/install_smoke` をビルドし、`find_package(openrasterpp CONFIG REQUIRED)` による下流利用を確認します。
-このスクリプトは既定ではリポジトリ直下の `vcpkg_installed/x64-linux` を依存プレフィックスとして参照します。
+`test.sh` は install 後の core/backend smoke（configure/build）まで実行します。
 
-## インストールと利用方法
-
-ライブラリをインストールする例:
+## インストール
 
 ```bash
 cmake --install build --prefix "$PWD/build/install-prefix"
 ```
 
-インストール後は `openrasterppConfig.cmake` と export された target が配置されるので、下流プロジェクトから次のように使えます。
+## 利用方法
+
+### 1) core のみ使う
 
 ```cmake
-find_package(openrasterpp CONFIG REQUIRED)
+find_package(openrasterpp CONFIG REQUIRED COMPONENTS core)
 
-add_executable(my_app main.cpp)
-target_link_libraries(my_app PRIVATE openrasterpp::openrasterpp)
+target_link_libraries(my_app PRIVATE openrasterpp::openrasterpp-core)
 ```
 
-`openrasterpp` 自体だけでなく、その依存ライブラリも CMake から見つけられる必要があります。
-そのため、下流プロジェクトでは `CMAKE_PREFIX_PATH` に `openrasterpp` の install prefix と依存ライブラリの prefix を含めてください。
+### 2) lodepng backend を使う
 
-```bash
-cmake -S . -B build \
-  -DCMAKE_PREFIX_PATH="/path/to/openrasterpp;/path/to/dependencies"
+```cmake
+find_package(openrasterpp CONFIG REQUIRED COMPONENTS png-lodepng)
+
+target_link_libraries(my_app PRIVATE openrasterpp::openrasterpp-png-lodepng)
 ```
 
-このリポジトリのローカル検証例では、次のような形になります。
+```cpp
+#include <openraster_lodepng.hpp>
 
-```bash
-cmake -S test/install_smoke -B build/install-smoke \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_PREFIX_PATH="$PWD/build/install-prefix;$PWD/vcpkg_installed/x64-linux"
+auto result = ora::lodepng::read("example.ora");
 ```
 
-## 使用例
-
-以下は、単純な `.ora` ドキュメントを生成して書き出し、再度読み込む最小例です。
+## 最小例（backend 明示）
 
 ```cpp
 #include <iostream>
-#include <utility>
 
-#include <openraster.hpp>
+#include <openraster_lodepng.hpp>
 
 auto main() -> int {
   auto background = ora::util::blank_image(256, 256, 255);
@@ -139,7 +110,7 @@ auto main() -> int {
     return 1;
   }
 
-  auto background_png = ora::util::encode_png(*background);
+  auto background_png = ora::lodepng::encode_png(*background);
   if (!background_png) {
     std::cerr << background_png.error().message << '\n';
     return 1;
@@ -154,36 +125,68 @@ auto main() -> int {
     .thumbnail_png = std::nullopt
   };
 
-  if (auto result = ora::util::render_preview_and_thumbnail(doc); !result) {
+  if (auto result = ora::lodepng::render_preview_and_thumbnail(doc); !result) {
     std::cerr << result.error().message << '\n';
     return 1;
   }
 
-  if (auto result = ora::write("example.ora", doc); !result) {
+  if (auto result = ora::lodepng::write("example.ora", doc); !result) {
     std::cerr << result.error().message << '\n';
     return 1;
   }
 
-  auto loaded = ora::read("example.ora");
+  auto loaded = ora::lodepng::read("example.ora");
   if (!loaded) {
     std::cerr << loaded.error().message << '\n';
     return 1;
   }
 
-  std::cout << "Loaded document: "
-            << loaded->width << "x" << loaded->height << '\n';
+  std::cout << "Loaded document: " << loaded->width << "x" << loaded->height << '\n';
   return 0;
 }
 ```
 
-この例では、ドキュメントの読み書きは `ora`、補助的な画像生成と PNG 変換は `ora::util` を使っています。
+## 移行ガイド
 
-`OraDocument::layer_images` には各レイヤーの PNG バイト列を設定します。
-空の `ImageBuffer` が必要な場合は `ora::util::blank_image()` を使えます。
-RGBA 画像からレイヤーを作る場合は `ora::util::encode_png()` を使ってください。
+### CMake
 
-`ora::write()` は `mergedimage.png` と `Thumbnails/thumbnail.png` を
-内部生成しません。必要なら `ora::util::render_preview_and_thumbnail()` で
-これらの PNG を `OraDocument` に設定してから `write()` を呼び出します。
-`ora::read()` で読み込んだ `OraDocument` をそのまま再書き出しする場合も、
-必要なら preview / thumbnail を補ってから `write()` を呼び出します。
+旧:
+
+```cmake
+find_package(openrasterpp CONFIG REQUIRED)
+target_link_libraries(my_app PRIVATE openrasterpp::openrasterpp)
+```
+
+新:
+
+```cmake
+find_package(openrasterpp CONFIG REQUIRED COMPONENTS png-lodepng)
+target_link_libraries(my_app PRIVATE openrasterpp::openrasterpp-png-lodepng)
+```
+
+### API
+
+旧:
+
+```cpp
+#include <openraster.hpp>
+auto doc = ora::read("a.ora");
+```
+
+新:
+
+```cpp
+#include <openraster_lodepng.hpp>
+auto doc = ora::lodepng::read("a.ora");
+```
+
+`ora::read(...)` など backend 非明示 wrapper は廃止されています。  
+高度な用途では `ora::read(provider, ...)` の provider API を使ってください。
+
+## backend 追加方法
+
+1. `src/backends/<name>_backend.cpp` を追加して PNG codec を実装
+2. `OraProvider` 契約を満たす provider を作り、`ora::read/write` テンプレートへ接続
+3. `openraster_<name>.hpp` façade を追加（公開面に 3rd-party ヘッダを露出しない）
+4. CMake に `openrasterpp-png-<name>` target と component を追加
+5. install smoke に新 backend の consumer 経路を追加

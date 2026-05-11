@@ -17,6 +17,7 @@ foreach(component IN LISTS openrasterpp_FIND_COMPONENTS)
 endforeach()
 
 if(openrasterpp_FOUND)
+  find_dependency(minizip-ng CONFIG REQUIRED)
   include("${CMAKE_CURRENT_LIST_DIR}/openrasterppCoreTargets.cmake")
   set(openrasterpp_core_FOUND TRUE)
 endif()
