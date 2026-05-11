@@ -122,7 +122,7 @@ Extend `vcpkg.json` with:
 
 Dependency resolution will be explicit per backend instead of copying the `lodepng` pattern blindly:
 
-- `libspng`: `find_package(spng CONFIG REQUIRED)` and link `spng::spng`
+- `libspng`: `find_package(SPNG CONFIG REQUIRED)` and link whichever exported target exists, using the vcpkg-supported pattern `$<IF:$<TARGET_EXISTS:spng::spng>,spng::spng,spng::spng_static>`
 - `libpng`: `find_package(PNG REQUIRED)` and link `PNG::PNG`
 - `stb`: treat as a build-time header-only dependency for `openrasterpp-png-stb`; resolve its headers explicitly during this project build instead of assuming an imported target, and do not model it as a consumer-side linked dependency
 
@@ -157,9 +157,17 @@ Add three new package components:
 
 The backend config fragments will also be backend-specific in their dependency handling:
 
-- `png-libspng`: `find_dependency(spng CONFIG REQUIRED)`
+- `png-libspng`: `find_dependency(SPNG CONFIG REQUIRED)` and include exported targets that already encode the `spng::spng` versus `spng::spng_static` selection
 - `png-libpng`: `find_dependency(PNG REQUIRED)`
 - `png-stb`: no `find_dependency()` for stb because the backend is already compiled and the public headers do not expose stb types or headers
+
+Each backend config fragment must also set the component FOUND variables expected by `check_required_components(openrasterpp)`, following the current `png-lodepng` pattern:
+
+- `openrasterpp_png-libspng_FOUND` and `openrasterpp_png_libspng_FOUND`
+- `openrasterpp_png-libpng_FOUND` and `openrasterpp_png_libpng_FOUND`
+- `openrasterpp_png-stb_FOUND` and `openrasterpp_png_stb_FOUND`
+
+`cmake/openrasterppConfig.cmake.in` will also need its supported-component list and conditional includes expanded for these three new components.
 
 This keeps package resolution consistent with the current `core` and `png-lodepng` component model while accounting for the fact that the new dependencies do not share one uniform CMake integration story.
 
