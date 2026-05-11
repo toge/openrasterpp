@@ -174,8 +174,11 @@ Each test file will cover:
 - `encode_png()` returns a valid PNG header
 - `render_preview_and_thumbnail()` populates preview assets
 - `write()` then `read()` round-trips an ORA document
+- invalid layer PNG bytes are rejected during both `read()` and `render_preview_and_thumbnail()` with `Error::Code::PngDecodeFailed`
 
 Extend install-smoke coverage with separate consumer projects for each new backend so exported package/component usage is validated after `cmake --install`.
+
+Extend the existing `install_smoke_core` check so the `core` component is also verified not to leak `libspng`, `libpng`, or `stb` through its exported link interface or imported targets, matching the existing anti-leak guard for `lodepng`.
 
 ## Documentation
 
