@@ -2,7 +2,27 @@
 
 include(CMakeFindDependencyMacro)
 
-find_dependency(minizip-ng CONFIG REQUIRED)
-find_dependency(lodepng CONFIG REQUIRED)
+set(_openrasterpp_supported_components core png-lodepng)
+set(openrasterpp_FOUND TRUE)
 
-include("${CMAKE_CURRENT_LIST_DIR}/openrasterppTargets.cmake")
+if(NOT openrasterpp_FIND_COMPONENTS)
+  set(openrasterpp_FIND_COMPONENTS core)
+endif()
+
+foreach(component IN LISTS openrasterpp_FIND_COMPONENTS)
+  if(NOT component IN_LIST _openrasterpp_supported_components)
+    set(openrasterpp_FOUND FALSE)
+    set(openrasterpp_NOT_FOUND_MESSAGE "Unsupported component: ${component}")
+  endif()
+endforeach()
+
+if(openrasterpp_FOUND)
+  include("${CMAKE_CURRENT_LIST_DIR}/openrasterppCoreTargets.cmake")
+  set(openrasterpp_core_FOUND TRUE)
+endif()
+
+if(openrasterpp_FOUND AND "png-lodepng" IN_LIST openrasterpp_FIND_COMPONENTS)
+  include("${CMAKE_CURRENT_LIST_DIR}/openrasterppConfig-png-lodepng.cmake")
+endif()
+
+check_required_components(openrasterpp)

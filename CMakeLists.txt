@@ -16,19 +16,30 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(minizip-ng CONFIG REQUIRED)
 find_package(lodepng CONFIG REQUIRED)
 
-# Library
-add_library(openrasterpp openraster.cpp openraster.hpp)
-target_compile_features(openrasterpp PUBLIC cxx_std_23)
+# Libraries
+add_library(openrasterpp-core openraster_core.cpp openraster.hpp)
+target_compile_features(openrasterpp-core PUBLIC cxx_std_23)
+
+add_library(openrasterpp-png-lodepng
+    src/backends/lodepng_backend.cpp
+    openraster_lodepng.hpp
+)
+target_compile_features(openrasterpp-png-lodepng PUBLIC cxx_std_23)
 
 set(openrasterpp_install_cmakedir "${CMAKE_INSTALL_LIBDIR}/cmake/openrasterpp")
 
-target_include_directories(openrasterpp PUBLIC
+target_include_directories(openrasterpp-core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
-# minizip-ng and lodepng linkage
-target_link_libraries(openrasterpp PUBLIC
+target_include_directories(openrasterpp-png-lodepng PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+
+target_link_libraries(openrasterpp-png-lodepng PUBLIC
+    openrasterpp-core
     MINIZIP::minizip-ng
     lodepng
 )
@@ -45,9 +56,16 @@ configure_package_config_file(
     INSTALL_DESTINATION "${openrasterpp_install_cmakedir}"
 )
 
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/openrasterppConfig-png-lodepng.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/openrasterppConfig-png-lodepng.cmake"
+    @ONLY
+)
+
 install(
-    TARGETS openrasterpp
-    EXPORT openrasterppTargets
+    TARGETS openrasterpp-core
+    EXPORT openrasterppCoreTargets
+    COMPONENT core
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -57,13 +75,39 @@ install(
 install(
     FILES openraster.hpp
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    COMPONENT core
 )
 
 install(
-    EXPORT openrasterppTargets
-    FILE openrasterppTargets.cmake
+    TARGETS openrasterpp-png-lodepng
+    EXPORT openrasterppPngLodepngTargets
+    COMPONENT png-lodepng
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(
+    FILES openraster_lodepng.hpp
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    COMPONENT png-lodepng
+)
+
+install(
+    EXPORT openrasterppCoreTargets
+    FILE openrasterppCoreTargets.cmake
     NAMESPACE openrasterpp::
     DESTINATION "${openrasterpp_install_cmakedir}"
+    COMPONENT core
+)
+
+install(
+    EXPORT openrasterppPngLodepngTargets
+    FILE openrasterppPngLodepngTargets.cmake
+    NAMESPACE openrasterpp::
+    DESTINATION "${openrasterpp_install_cmakedir}"
+    COMPONENT png-lodepng
 )
 
 install(
@@ -71,6 +115,13 @@ install(
         "${CMAKE_CURRENT_BINARY_DIR}/openrasterppConfig.cmake"
         "${CMAKE_CURRENT_BINARY_DIR}/openrasterppConfigVersion.cmake"
     DESTINATION "${openrasterpp_install_cmakedir}"
+    COMPONENT core
+)
+
+install(
+    FILES "${CMAKE_CURRENT_BINARY_DIR}/openrasterppConfig-png-lodepng.cmake"
+    DESTINATION "${openrasterpp_install_cmakedir}"
+    COMPONENT png-lodepng
 )
 
 # minizip-ng compatibility headers might be needed if they are not in the default path
@@ -79,9 +130,11 @@ install(
 
 # Warnings and optimizations
 if(MSVC)
-    target_compile_options(openrasterpp PRIVATE /W4 /Ox)
+    target_compile_options(openrasterpp-core PRIVATE /W4 /Ox)
+    target_compile_options(openrasterpp-png-lodepng PRIVATE /W4 /Ox)
 else()
-    target_compile_options(openrasterpp PRIVATE -Wall -Wextra -pedantic -O3 -march=native)
+    target_compile_options(openrasterpp-core PRIVATE -Wall -Wextra -pedantic -O3 -march=native)
+    target_compile_options(openrasterpp-png-lodepng PRIVATE -Wall -Wextra -pedantic -O3 -march=native)
 endif()
 
 # Tests

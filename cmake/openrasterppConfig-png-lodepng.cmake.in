@@ -1,0 +1,8 @@
+include(CMakeFindDependencyMacro)
+
+find_dependency(minizip-ng CONFIG REQUIRED)
+find_dependency(lodepng CONFIG REQUIRED)
+
+include("${CMAKE_CURRENT_LIST_DIR}/openrasterppPngLodepngTargets.cmake")
+set(openrasterpp_png-lodepng_FOUND TRUE)
+set(openrasterpp_png_lodepng_FOUND TRUE)

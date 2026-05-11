@@ -412,21 +412,6 @@ auto render_preview_and_thumbnail(Provider& provider, OraDocument& doc)
   return {};
 }
 
-/**
- * @brief ImageBuffer を PNG バイト列へ変換します。
- * @param image 変換対象の画像です。
- * @return PNG バイト列、失敗時はエラーを返します。
- */
-[[nodiscard]]
-auto encode_png(const ImageBuffer& image) -> std::expected<std::vector<uint8_t>, Error>;
-
-/**
- * @brief レイヤー PNG から mergedimage / thumbnail を生成して doc に設定します。
- * @param doc 画像を追加設定する対象ドキュメントです。
- * @return 生成に成功した場合は空の `expected`、失敗時はエラーを返します。
- */
-auto render_preview_and_thumbnail(OraDocument& doc) -> std::expected<void, Error>;
-
 } // namespace util
 
 /**
@@ -510,34 +495,6 @@ auto write(Provider& provider, std::string_view filename, const OraDocument& doc
 
   cleanup(); return {};
 }
-
-/**
- * @brief 既存のコードベースと互換性を保つためのデフォルトプロバイダ
- * @details ZIP および PNG 処理の既定実装を利用する前方宣言です。
- */
-class DefaultOraProvider;
-
-/**
- * @brief デフォルトプロバイダを使用した読み込み（後方互換用）
- * @param filename 読み込む `.ora` ファイル名またはパスです。
- * @return 読み込んだドキュメント、失敗時はエラーを返します。
- */
-[[nodiscard]]
-auto read(std::string_view filename) -> std::expected<OraDocument, Error>;
-
-/**
- * @brief デフォルトプロバイダを使用した書き込み（後方互換用）
- *
- * `doc.layer_images` には各レイヤーの PNG バイト列を、
- * `doc.merged_image_png` と `doc.thumbnail_png` には、呼び出し側が
- * 用意した PNG バイト列を設定しておく必要があります。
- *
- * @param filename 書き込み先 `.ora` ファイル名またはパスです。
- * @param doc 書き込むドキュメントです。
- * @return 書き込みに成功した場合は空の `expected`、失敗時はエラーを返します。
- */
-[[nodiscard]]
-auto write(std::string_view filename, const OraDocument& doc) -> std::expected<void, Error>;
 
 } // namespace ora
 

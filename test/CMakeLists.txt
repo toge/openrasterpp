@@ -123,6 +123,87 @@ add_test(
     -P "${task1_spec_fixture_contents_script}"
 )
 
+set(task2_package_split_fixture_contents_script
+  "${CMAKE_CURRENT_BINARY_DIR}/task2_package_split_fixture_contents.cmake"
+)
+file(WRITE "${task2_package_split_fixture_contents_script}" [==[
+cmake_minimum_required(VERSION 3.25)
+
+if(NOT DEFINED OPENRASTERPP_SOURCE_DIR)
+  message(FATAL_ERROR "OPENRASTERPP_SOURCE_DIR is required")
+endif()
+
+function(assert_contains file_path needle)
+  file(READ "${file_path}" content)
+  string(FIND "${content}" "${needle}" needle_index)
+  if(needle_index EQUAL -1)
+    message(FATAL_ERROR "Expected '${needle}' in ${file_path}")
+  endif()
+endfunction()
+
+function(assert_not_contains file_path needle)
+  file(READ "${file_path}" content)
+  string(FIND "${content}" "${needle}" needle_index)
+  if(NOT needle_index EQUAL -1)
+    message(FATAL_ERROR "Did not expect '${needle}' in ${file_path}")
+  endif()
+endfunction()
+
+set(root_cmakelists "${OPENRASTERPP_SOURCE_DIR}/CMakeLists.txt")
+assert_contains("${root_cmakelists}" "add_library(openrasterpp-core")
+assert_contains("${root_cmakelists}" "openrasterpp-png-lodepng")
+assert_contains("${root_cmakelists}" "openraster_core.cpp")
+assert_contains("${root_cmakelists}" "src/backends/lodepng_backend.cpp")
+assert_contains("${root_cmakelists}" "EXPORT openrasterppCoreTargets")
+assert_contains("${root_cmakelists}" "FILE openrasterppCoreTargets.cmake")
+assert_contains("${root_cmakelists}" "COMPONENT core")
+assert_contains("${root_cmakelists}" "EXPORT openrasterppPngLodepngTargets")
+assert_contains("${root_cmakelists}" "FILE openrasterppPngLodepngTargets.cmake")
+assert_contains("${root_cmakelists}" "COMPONENT png-lodepng")
+assert_contains("${root_cmakelists}" "openraster_lodepng.hpp")
+assert_not_contains("${root_cmakelists}" "install(\n    EXPORT openrasterppTargets")
+
+set(config_template "${OPENRASTERPP_SOURCE_DIR}/cmake/openrasterppConfig.cmake.in")
+assert_contains("${config_template}" "include(\"\${CMAKE_CURRENT_LIST_DIR}/openrasterppCoreTargets.cmake\")")
+assert_contains("${config_template}" "if(NOT openrasterpp_FIND_COMPONENTS)")
+assert_contains("${config_template}" "set(openrasterpp_FIND_COMPONENTS core)")
+assert_contains("${config_template}" "\"png-lodepng\" IN_LIST openrasterpp_FIND_COMPONENTS")
+assert_contains("${config_template}" "include(\"\${CMAKE_CURRENT_LIST_DIR}/openrasterppConfig-png-lodepng.cmake\")")
+assert_contains("${config_template}" "check_required_components(openrasterpp)")
+
+set(backend_config_template
+  "${OPENRASTERPP_SOURCE_DIR}/cmake/openrasterppConfig-png-lodepng.cmake.in"
+)
+assert_contains("${backend_config_template}" "find_dependency(lodepng CONFIG REQUIRED)")
+assert_contains("${backend_config_template}" "include(\"\${CMAKE_CURRENT_LIST_DIR}/openrasterppPngLodepngTargets.cmake\")")
+
+set(core_header "${OPENRASTERPP_SOURCE_DIR}/openraster.hpp")
+assert_not_contains("${core_header}" "class DefaultOraProvider;")
+assert_not_contains("${core_header}" "auto encode_png(const ImageBuffer& image) -> std::expected<std::vector<uint8_t>, Error>;")
+assert_not_contains("${core_header}" "auto render_preview_and_thumbnail(OraDocument& doc) -> std::expected<void, Error>;")
+assert_not_contains("${core_header}" "auto read(std::string_view filename) -> std::expected<OraDocument, Error>;")
+assert_not_contains("${core_header}" "auto write(std::string_view filename, const OraDocument& doc) -> std::expected<void, Error>;")
+
+set(backend_header "${OPENRASTERPP_SOURCE_DIR}/openraster_lodepng.hpp")
+assert_contains("${backend_header}" "namespace ora::util {")
+assert_contains("${backend_header}" "auto encode_png(ImageBuffer const& image) -> std::expected<std::vector<uint8_t>, Error>;")
+assert_contains("${backend_header}" "auto render_preview_and_thumbnail(OraDocument& doc) -> std::expected<void, Error>;")
+assert_contains("${backend_header}" "namespace ora {")
+assert_contains("${backend_header}" "auto read(std::string_view filename) -> std::expected<OraDocument, Error>;")
+assert_contains("${backend_header}" "auto write(std::string_view filename, OraDocument const& doc) -> std::expected<void, Error>;")
+
+set(core_source "${OPENRASTERPP_SOURCE_DIR}/openraster_core.cpp")
+assert_not_contains("${core_source}" "auto escape_xml(")
+assert_not_contains("${core_source}" "auto generate_node_xml(")
+]==])
+
+add_test(
+  NAME task2_package_split_fixture_contents
+  COMMAND ${CMAKE_COMMAND}
+    "-DOPENRASTERPP_SOURCE_DIR=${PROJECT_SOURCE_DIR}"
+    -P "${task2_package_split_fixture_contents_script}"
+)
+
 set(install_smoke_prefix "${CMAKE_BINARY_DIR}/test/install-prefix")
 set(install_smoke_core_build_dir "${CMAKE_BINARY_DIR}/test/install-smoke-core")
 set(install_smoke_backend_build_dir "${CMAKE_BINARY_DIR}/test/install-smoke")
@@ -160,6 +241,46 @@ add_test(
 set_tests_properties(install_package PROPERTIES
   FIXTURES_REQUIRED install_smoke_clean
   FIXTURES_SETUP install_smoke_prefix
+  RESOURCE_LOCK install_smoke
+)
+
+set(task2_installed_package_layout_script
+  "${CMAKE_CURRENT_BINARY_DIR}/task2_installed_package_layout.cmake"
+)
+file(WRITE "${task2_installed_package_layout_script}" [==[
+cmake_minimum_required(VERSION 3.25)
+
+if(NOT DEFINED OPENRASTERPP_INSTALL_PREFIX)
+  message(FATAL_ERROR "OPENRASTERPP_INSTALL_PREFIX is required")
+endif()
+
+function(assert_exists file_path)
+  if(NOT EXISTS "${file_path}")
+    message(FATAL_ERROR "Expected file to exist: ${file_path}")
+  endif()
+endfunction()
+
+set(package_dir "${OPENRASTERPP_INSTALL_PREFIX}/lib/cmake/openrasterpp")
+if(NOT EXISTS "${package_dir}")
+  set(package_dir "${OPENRASTERPP_INSTALL_PREFIX}/lib64/cmake/openrasterpp")
+endif()
+assert_exists("${package_dir}/openrasterppConfig.cmake")
+assert_exists("${package_dir}/openrasterppConfigVersion.cmake")
+assert_exists("${package_dir}/openrasterppConfig-png-lodepng.cmake")
+assert_exists("${package_dir}/openrasterppCoreTargets.cmake")
+assert_exists("${package_dir}/openrasterppPngLodepngTargets.cmake")
+assert_exists("${OPENRASTERPP_INSTALL_PREFIX}/include/openraster.hpp")
+assert_exists("${OPENRASTERPP_INSTALL_PREFIX}/include/openraster_lodepng.hpp")
+]==])
+
+add_test(
+  NAME task2_installed_package_layout
+  COMMAND ${CMAKE_COMMAND}
+    "-DOPENRASTERPP_INSTALL_PREFIX=${install_smoke_prefix}"
+    -P "${task2_installed_package_layout_script}"
+)
+set_tests_properties(task2_installed_package_layout PROPERTIES
+  FIXTURES_REQUIRED install_smoke_prefix
   RESOURCE_LOCK install_smoke
 )
 
