@@ -24,6 +24,13 @@ target_link_libraries(lodepng_backend_test PRIVATE
 target_compile_features(lodepng_backend_test PRIVATE cxx_std_26)
 add_test(NAME lodepng_backend_test COMMAND lodepng_backend_test)
 
+add_test(
+  NAME task1_spec_fixture_contents
+  COMMAND ${CMAKE_COMMAND}
+    "-DOPENRASTERPP_SOURCE_DIR=${PROJECT_SOURCE_DIR}"
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/task1_spec_fixture_contents.cmake"
+)
+
 set(install_smoke_prefix "${CMAKE_BINARY_DIR}/test/install-prefix")
 set(install_smoke_core_build_dir "${CMAKE_BINARY_DIR}/test/install-smoke-core")
 set(install_smoke_backend_build_dir "${CMAKE_BINARY_DIR}/test/install-smoke")
