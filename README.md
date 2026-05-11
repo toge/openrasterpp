@@ -86,7 +86,9 @@ ctest --test-dir build -V
 sh ./test.sh
 ```
 
-`test.sh` は `cmake --install` 後に `test/install_smoke` をビルドし、`find_package(openrasterpp CONFIG REQUIRED)` による下流利用を確認します。
+`test.sh` は install smoke 用の CTest (`install_package` + `install_smoke_*`) だけを実行し、
+`find_package(openrasterpp CONFIG REQUIRED)` による下流利用が install + configure + build まで到達することを確認します。
+現時点では backend smoke は install 済み backend 向け header / target が未実装のため失敗する想定です。
 このスクリプトは既定ではリポジトリ直下の `vcpkg_installed/x64-linux` を依存プレフィックスとして参照します。
 
 ## インストールと利用方法
@@ -117,9 +119,15 @@ cmake -S . -B build \
 このリポジトリのローカル検証例では、次のような形になります。
 
 ```bash
+cmake -S test/install_smoke_core -B build/install-smoke-core \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_PREFIX_PATH="$PWD/build/install-prefix;$PWD/vcpkg_installed/x64-linux"
+cmake --build build/install-smoke-core
+
 cmake -S test/install_smoke -B build/install-smoke \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_PREFIX_PATH="$PWD/build/install-prefix;$PWD/vcpkg_installed/x64-linux"
+cmake --build build/install-smoke
 ```
 
 ## 使用例

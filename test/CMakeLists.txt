@@ -64,7 +64,7 @@ set_tests_properties(install_package PROPERTIES
   RESOURCE_LOCK install_smoke
 )
 
-function(add_install_smoke_configure_test name source_dir build_dir)
+function(add_install_smoke_configure_test name source_dir build_dir fixture_name)
   set(configure_command
     ${CMAKE_COMMAND}
     -S "${source_dir}"
@@ -107,6 +107,27 @@ function(add_install_smoke_configure_test name source_dir build_dir)
   )
   set_tests_properties("${name}" PROPERTIES
     FIXTURES_REQUIRED install_smoke_prefix
+    FIXTURES_SETUP "${fixture_name}"
+    RESOURCE_LOCK install_smoke
+  )
+endfunction()
+
+function(add_install_smoke_build_test name build_dir fixture_name)
+  set(build_command
+    ${CMAKE_COMMAND}
+    --build "${build_dir}"
+  )
+
+  if(CMAKE_CONFIGURATION_TYPES)
+    list(APPEND build_command --config "$<CONFIG>")
+  endif()
+
+  add_test(
+    NAME "${name}"
+    COMMAND ${build_command}
+  )
+  set_tests_properties("${name}" PROPERTIES
+    FIXTURES_REQUIRED "${fixture_name}"
     RESOURCE_LOCK install_smoke
   )
 endfunction()
@@ -115,10 +136,24 @@ add_install_smoke_configure_test(
   install_smoke_core_configure
   "${CMAKE_CURRENT_SOURCE_DIR}/install_smoke_core"
   "${install_smoke_core_build_dir}"
+  install_smoke_core_configured
 )
 
 add_install_smoke_configure_test(
   install_smoke_backend_configure
   "${CMAKE_CURRENT_SOURCE_DIR}/install_smoke"
   "${install_smoke_backend_build_dir}"
+  install_smoke_backend_configured
+)
+
+add_install_smoke_build_test(
+  install_smoke_core_build
+  "${install_smoke_core_build_dir}"
+  install_smoke_core_configured
+)
+
+add_install_smoke_build_test(
+  install_smoke_backend_build
+  "${install_smoke_backend_build_dir}"
+  install_smoke_backend_configured
 )
