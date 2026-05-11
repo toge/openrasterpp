@@ -117,25 +117,29 @@ public:
    * @brief 画像の幅を返します。
    * @return 幅（ピクセル）です。
    */
-  [[nodiscard]] auto width() const noexcept -> unsigned int { return width_; }
+  [[nodiscard]]
+  auto width() const noexcept -> unsigned int { return width_; }
 
   /**
    * @brief 画像の高さを返します。
    * @return 高さ（ピクセル）です。
    */
-  [[nodiscard]] auto height() const noexcept -> unsigned int { return height_; }
+  [[nodiscard]]
+  auto height() const noexcept -> unsigned int { return height_; }
 
   /**
    * @brief 読み取り専用の RGBA バイト列ビューを返します。
    * @return 先頭から `width() * height() * 4` バイトの読み取り専用スパンです。
    */
-  [[nodiscard]] auto rgba() const noexcept -> std::span<const uint8_t> { return rgba_; }
+  [[nodiscard]]
+  auto rgba() const noexcept -> std::span<const uint8_t> { return rgba_; }
 
   /**
    * @brief 書き込み可能な RGBA バイト列ビューを返します。
    * @return 画像本体を直接編集できるスパンです。
    */
-  [[nodiscard]] auto rgba_mut() noexcept -> std::span<uint8_t> { return rgba_; }
+  [[nodiscard]]
+  auto rgba_mut() noexcept -> std::span<uint8_t> { return rgba_; }
 
 private:
   ImageBuffer(unsigned int width, unsigned int height, std::vector<uint8_t> rgba)
@@ -432,9 +436,13 @@ auto read(Provider& provider, std::string_view filename) -> std::expected<OraDoc
     cleanup(); return detail::make_unexpected(Error::Code::InvalidOraDocument, "mimetype");
   }
   auto xml_bytes = provider.read_entry("stack.xml");
-  if (!xml_bytes) { cleanup(); return std::unexpected(xml_bytes.error()); }
+  if (!xml_bytes) {
+    cleanup(); return std::unexpected(xml_bytes.error());
+  }
   auto doc_res = provider.deserialize_stack(*xml_bytes);
-  if (!doc_res) { cleanup(); return std::unexpected(doc_res.error()); }
+  if (!doc_res) {
+    cleanup(); return std::unexpected(doc_res.error());
+  }
   auto doc = std::move(*doc_res);
   auto load_images = [&](auto self, std::span<const Node> nodes) -> std::expected<void, Error> {
     for (auto const& node : nodes) {
@@ -449,7 +457,9 @@ auto read(Provider& provider, std::string_view filename) -> std::expected<OraDoc
     }
     return {};
   };
-  if (auto res = load_images(load_images, doc.root_nodes); !res) { cleanup(); return std::unexpected(res.error()); }
+  if (auto res = load_images(load_images, doc.root_nodes); !res) {
+    cleanup(); return std::unexpected(res.error());
+  }
   cleanup(); return doc;
 }
 
@@ -470,30 +480,50 @@ template<OraProvider Provider>
 [[nodiscard]]
 auto write(Provider& provider, std::string_view filename, const OraDocument& doc) -> std::expected<void, Error> {
   auto open_res = provider.open_archive(filename, ArchiveMode::Write);
-  if (!open_res) return std::unexpected(open_res.error());
+  if (!open_res) {
+    return std::unexpected(open_res.error());
+  }
   auto cleanup = [&provider] { provider.close_archive(); };
 
   std::string_view mimetype = "image/openraster";
-  if (auto res = provider.write_entry("mimetype", std::span(reinterpret_cast<const uint8_t*>(mimetype.data()), mimetype.size()), CompressionLevel::None); !res) { cleanup(); return res; }
+  if (auto res = provider.write_entry("mimetype", std::span(reinterpret_cast<const uint8_t*>(mimetype.data()), mimetype.size()), CompressionLevel::None); !res) {
+    cleanup();
+    return res;
+  }
 
   auto xml = provider.serialize_stack(doc);
-  if (auto res = provider.write_entry("stack.xml", std::span(reinterpret_cast<const uint8_t*>(xml.data()), xml.size()), CompressionLevel::Default); !res) { cleanup(); return res; }
+  if (auto res = provider.write_entry("stack.xml", std::span(reinterpret_cast<const uint8_t*>(xml.data()), xml.size()), CompressionLevel::Default); !res) {
+    cleanup();
+    return res;
+  }
 
   for (auto const& [name, png] : doc.layer_images) {
-    if (auto res = provider.write_entry("data/" + name + ".png", png, CompressionLevel::Default); !res) { cleanup(); return res; }
+    if (auto res = provider.write_entry("data/" + name + ".png", png, CompressionLevel::Default); !res) {
+      cleanup();
+      return res;
+    }
   }
 
   if (!doc.merged_image_png) {
-    cleanup(); return detail::make_unexpected(Error::Code::InvalidOraDocument, "mergedimage.png", "caller-provided preview asset is required");
+    cleanup();
+    return detail::make_unexpected(Error::Code::InvalidOraDocument, "mergedimage.png", "caller-provided preview asset is required");
   }
   if (!doc.thumbnail_png) {
-    cleanup(); return detail::make_unexpected(Error::Code::InvalidOraDocument, "Thumbnails/thumbnail.png", "caller-provided thumbnail asset is required");
+    cleanup();
+    return detail::make_unexpected(Error::Code::InvalidOraDocument, "Thumbnails/thumbnail.png", "caller-provided thumbnail asset is required");
   }
 
-  if (auto res = provider.write_entry("mergedimage.png", *doc.merged_image_png, CompressionLevel::Default); !res) { cleanup(); return res; }
-  if (auto res = provider.write_entry("Thumbnails/thumbnail.png", *doc.thumbnail_png, CompressionLevel::Default); !res) { cleanup(); return res; }
+  if (auto res = provider.write_entry("mergedimage.png", *doc.merged_image_png, CompressionLevel::Default); !res) {
+    cleanup();
+    return res;
+  }
+  if (auto res = provider.write_entry("Thumbnails/thumbnail.png", *doc.thumbnail_png, CompressionLevel::Default); !res) {
+    cleanup();
+    return res;
+  }
 
-  cleanup(); return {};
+  cleanup();
+  return {};
 }
 
 } // namespace ora

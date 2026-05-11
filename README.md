@@ -1,6 +1,6 @@
 # openrasterpp
 
-`openrasterpp` は OpenRaster（`.ora`）ドキュメントを扱う C++26 ライブラリです。  
+`openrasterpp` は OpenRaster（`.ora`）ドキュメントを扱う C++26 ライブラリです。
 現在は **core + PNG backend target 分離** 構成です。
 
 ## ターゲット構成
@@ -150,14 +150,6 @@ auto main() -> int {
 
 ### CMake
 
-旧:
-
-```cmake
-find_package(openrasterpp CONFIG REQUIRED)
-target_link_libraries(my_app PRIVATE openrasterpp::openrasterpp)
-```
-
-新:
 
 ```cmake
 find_package(openrasterpp CONFIG REQUIRED COMPONENTS png-lodepng)
@@ -166,22 +158,10 @@ target_link_libraries(my_app PRIVATE openrasterpp::openrasterpp-png-lodepng)
 
 ### API
 
-旧:
-
-```cpp
-#include <openraster.hpp>
-auto doc = ora::read("a.ora");
-```
-
-新:
-
 ```cpp
 #include <openraster_lodepng.hpp>
 auto doc = ora::lodepng::read("a.ora");
 ```
-
-`ora::read(...)` など backend 非明示 wrapper は廃止されています。  
-高度な用途では `ora::read(provider, ...)` の provider API を使ってください。
 
 ## backend 追加方法
 
