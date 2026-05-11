@@ -124,7 +124,7 @@ Dependency resolution will be explicit per backend instead of copying the `lodep
 
 - `libspng`: `find_package(SPNG CONFIG REQUIRED)` and link whichever exported target exists, using the vcpkg-supported pattern `$<IF:$<TARGET_EXISTS:spng::spng>,spng::spng,spng::spng_static>`
 - `libpng`: `find_package(PNG REQUIRED)` and link `PNG::PNG`
-- `stb`: treat as a build-time header-only dependency for `openrasterpp-png-stb`; resolve its headers explicitly during this project build instead of assuming an imported target, and do not model it as a consumer-side linked dependency
+- `stb`: treat as a build-time header-only dependency for `openrasterpp-png-stb`; resolve it with `find_package(Stb REQUIRED)` and consume `${Stb_INCLUDE_DIR}` via `target_include_directories()` instead of assuming an imported target, and do not model it as a consumer-side linked dependency
 
 ### CMake targets
 
@@ -199,6 +199,8 @@ Each test file will cover:
 Extend install-smoke coverage with separate consumer projects for each new backend so exported package/component usage is validated after `cmake --install`.
 
 Extend the existing `install_smoke_core` check so the `core` component is also verified not to leak `libspng`, `libpng`, or `stb`. For `libspng` and `libpng`, the check should cover exported link dependencies/imported targets. For `stb`, the check should also cover interface include directories and package-resolution side effects, so a mistaken `core`-only `find_package(openrasterpp COMPONENTS core)` does not end up resolving stb-related variables or paths.
+
+Add a dedicated `png-stb` install-smoke consumer that verifies consumer-side stb resolution is unnecessary: after `find_package(openrasterpp CONFIG REQUIRED COMPONENTS png-stb)`, the smoke project should be able to link and use `openrasterpp::openrasterpp-png-stb` without calling `find_package(Stb)`, and it should assert that `Stb_FOUND` / `Stb_INCLUDE_DIR` were not introduced as a side effect of resolving the `png-stb` component.
 
 ## Documentation
 
