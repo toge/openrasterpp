@@ -1,11 +1,13 @@
 cmake_minimum_required(VERSION 3.25)
-project(openrasterpp VERSION 1.0.0 LANGUAGES CXX)
+project(openrasterpp VERSION 0.1.0 LANGUAGES CXX)
+
+option(ENABLE_TESTS "Enable tests" ON)
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
 # C++ Standard
-set(CMAKE_CXX_STANDARD 26)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -16,7 +18,7 @@ find_package(lodepng CONFIG REQUIRED)
 
 # Library
 add_library(openrasterpp openraster.cpp openraster.hpp)
-target_compile_features(openrasterpp PUBLIC cxx_std_26)
+target_compile_features(openrasterpp PUBLIC cxx_std_23)
 
 set(openrasterpp_install_cmakedir "${CMAKE_INSTALL_LIBDIR}/cmake/openrasterpp")
 
@@ -83,8 +85,7 @@ else()
 endif()
 
 # Tests
-enable_testing()
-add_subdirectory(test)
-
-# Link tests to the library
-# (This is handled in test/CMakeLists.txt but we need to ensure the library is available)
+if(ENABLE_TESTS)
+    enable_testing()
+    add_subdirectory(test)
+endif()
