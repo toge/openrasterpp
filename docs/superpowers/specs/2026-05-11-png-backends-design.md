@@ -120,6 +120,12 @@ Extend `vcpkg.json` with:
 - `libpng`
 - `stb`
 
+Dependency resolution will be explicit per backend instead of copying the `lodepng` pattern blindly:
+
+- `libspng`: `find_package(spng CONFIG REQUIRED)` and link `spng::spng`
+- `libpng`: `find_package(PNG REQUIRED)` and link `PNG::PNG`
+- `stb`: treat as a build-time header-only dependency for `openrasterpp-png-stb`; resolve its headers explicitly during this project build instead of assuming an imported target, and do not model it as a consumer-side linked dependency
+
 ### CMake targets
 
 Add three new libraries:
@@ -149,7 +155,13 @@ Add three new package components:
 - `cmake/openrasterppConfig-png-libpng.cmake.in`
 - `cmake/openrasterppConfig-png-stb.cmake.in`
 
-This keeps package resolution consistent with the current `core` and `png-lodepng` component model.
+The backend config fragments will also be backend-specific in their dependency handling:
+
+- `png-libspng`: `find_dependency(spng CONFIG REQUIRED)`
+- `png-libpng`: `find_dependency(PNG REQUIRED)`
+- `png-stb`: no `find_dependency()` for stb because the backend is already compiled and the public headers do not expose stb types or headers
+
+This keeps package resolution consistent with the current `core` and `png-lodepng` component model while accounting for the fact that the new dependencies do not share one uniform CMake integration story.
 
 ## Data flow
 
@@ -178,7 +190,7 @@ Each test file will cover:
 
 Extend install-smoke coverage with separate consumer projects for each new backend so exported package/component usage is validated after `cmake --install`.
 
-Extend the existing `install_smoke_core` check so the `core` component is also verified not to leak `libspng`, `libpng`, or `stb` through its exported link interface or imported targets, matching the existing anti-leak guard for `lodepng`.
+Extend the existing `install_smoke_core` check so the `core` component is also verified not to leak `libspng`, `libpng`, or `stb`. For `libspng` and `libpng`, the check should cover exported link dependencies/imported targets. For `stb`, the check should also cover interface include directories and package-resolution side effects, so a mistaken `core`-only `find_package(openrasterpp COMPONENTS core)` does not end up resolving stb-related variables or paths.
 
 ## Documentation
 
