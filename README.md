@@ -86,7 +86,8 @@ ctest --test-dir build -V
 sh ./test.sh
 ```
 
-`test.sh` は `ctest --test-dir build -V` を実行する補助スクリプトです。
+`test.sh` は `cmake --install` 後に `test/install_smoke` をビルドし、`find_package(openrasterpp CONFIG REQUIRED)` による下流利用を確認します。
+このスクリプトは既定ではリポジトリ直下の `vcpkg_installed/x64-linux` を依存プレフィックスとして参照します。
 
 ## インストールと利用方法
 
@@ -111,6 +112,14 @@ target_link_libraries(my_app PRIVATE openrasterpp::openrasterpp)
 ```bash
 cmake -S . -B build \
   -DCMAKE_PREFIX_PATH="/path/to/openrasterpp;/path/to/dependencies"
+```
+
+このリポジトリのローカル検証例では、次のような形になります。
+
+```bash
+cmake -S test/install_smoke -B build/install-smoke \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_PREFIX_PATH="$PWD/build/install-prefix;$PWD/vcpkg_installed/x64-linux"
 ```
 
 ## 使用例
