@@ -29,12 +29,21 @@ if(TARGET spng::spng OR TARGET spng::spng_static)
 endif()
 
 # --- libpng anti-leak ---
-if(core_links MATCHES "PNG::PNG")
-  message(FATAL_ERROR "openrasterpp-core must not leak libpng (PNG::PNG)")
+set(core_libpng_leak_token "")
+foreach(core_link IN LISTS core_links)
+  string(TOLOWER "${core_link}" core_link_lower)
+  if(core_link_lower MATCHES "(^|[^a-z0-9_])(png::png|png|libpng)([^a-z0-9_]|$)")
+    set(core_libpng_leak_token "${core_link}")
+    break()
+  endif()
+endforeach()
+
+if(NOT core_libpng_leak_token STREQUAL "")
+  message(FATAL_ERROR "openrasterpp-core must not leak libpng token: ${core_libpng_leak_token}")
 endif()
 
-if(TARGET PNG::PNG)
-  message(FATAL_ERROR "core component must not resolve libpng (PNG::PNG)")
+if(TARGET PNG::PNG OR TARGET png OR TARGET libpng OR TARGET libpng::libpng)
+  message(FATAL_ERROR "core component must not resolve libpng (PNG::PNG/png/libpng)")
 endif()
 
 # --- stb anti-leak via interface include paths ---
