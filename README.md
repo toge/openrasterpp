@@ -14,6 +14,15 @@
 - `openrasterpp::openrasterpp-png-lodepng`
   - lodepng を使う PNG backend
   - `ora::lodepng::*` façade API を提供
+- `openrasterpp::openrasterpp-png-libspng`
+  - libspng を使う PNG backend
+  - `ora::libspng::*` façade API を提供
+- `openrasterpp::openrasterpp-png-libpng`
+  - libpng を使う PNG backend
+  - `ora::libpng::*` façade API を提供
+- `openrasterpp::openrasterpp-png-stb`
+  - stb を使う PNG backend（内部で `stb_image` + `stb_image_write` を利用）
+  - `ora::stb::*` façade API を提供
 
 ## 公開 API
 
@@ -35,6 +44,30 @@
 - `ora::lodepng::encode_png(...)`
 - `ora::lodepng::render_preview_and_thumbnail(...)`
 
+### libspng backend API（backend 明示）
+
+- `#include <openraster_libspng.hpp>`
+- `ora::libspng::read(...)`
+- `ora::libspng::write(...)`
+- `ora::libspng::encode_png(...)`
+- `ora::libspng::render_preview_and_thumbnail(...)`
+
+### libpng backend API（backend 明示）
+
+- `#include <openraster_libpng.hpp>`
+- `ora::libpng::read(...)`
+- `ora::libpng::write(...)`
+- `ora::libpng::encode_png(...)`
+- `ora::libpng::render_preview_and_thumbnail(...)`
+
+### stb backend API（backend 明示）
+
+- `#include <openraster_stb.hpp>`
+- `ora::stb::read(...)`
+- `ora::stb::write(...)`
+- `ora::stb::encode_png(...)`
+- `ora::stb::render_preview_and_thumbnail(...)`
+
 ## 必要要件
 
 - CMake 3.25+
@@ -45,6 +78,9 @@
 
 - core: `minizip-ng`
 - backend (`png-lodepng`): `lodepng`
+- backend (`png-libspng`): `libspng`
+- backend (`png-libpng`): `libpng`
+- backend (`png-stb`): `stb`（内部で `stb_image` + `stb_image_write`）
 - test: `Catch2`
 
 ## ビルド
@@ -94,6 +130,48 @@ target_link_libraries(my_app PRIVATE openrasterpp::openrasterpp-png-lodepng)
 #include <openraster_lodepng.hpp>
 
 auto result = ora::lodepng::read("example.ora");
+```
+
+### 3) libspng backend を使う
+
+```cmake
+find_package(openrasterpp CONFIG REQUIRED COMPONENTS png-libspng)
+
+target_link_libraries(my_app PRIVATE openrasterpp::openrasterpp-png-libspng)
+```
+
+```cpp
+#include <openraster_libspng.hpp>
+
+auto result = ora::libspng::read("example.ora");
+```
+
+### 4) libpng backend を使う
+
+```cmake
+find_package(openrasterpp CONFIG REQUIRED COMPONENTS png-libpng)
+
+target_link_libraries(my_app PRIVATE openrasterpp::openrasterpp-png-libpng)
+```
+
+```cpp
+#include <openraster_libpng.hpp>
+
+auto result = ora::libpng::read("example.ora");
+```
+
+### 5) stb backend を使う
+
+```cmake
+find_package(openrasterpp CONFIG REQUIRED COMPONENTS png-stb)
+
+target_link_libraries(my_app PRIVATE openrasterpp::openrasterpp-png-stb)
+```
+
+```cpp
+#include <openraster_stb.hpp>
+
+auto result = ora::stb::read("example.ora");
 ```
 
 ## 最小例（backend 明示）
