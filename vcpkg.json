@@ -5,6 +5,7 @@
     "minizip-ng",
     "libpng",
     "lodepng",
-    "libspng"
+    "libspng",
+    "stb"
   ]
 }

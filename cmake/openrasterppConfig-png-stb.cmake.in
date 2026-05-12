@@ -1,0 +1,3 @@
+include("${CMAKE_CURRENT_LIST_DIR}/openrasterppPngStbTargets.cmake")
+set(openrasterpp_png-stb_FOUND TRUE)
+set(openrasterpp_png_stb_FOUND TRUE)
