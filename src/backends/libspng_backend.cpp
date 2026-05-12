@@ -75,7 +75,8 @@ public:
           ctx_.get(),
           const_cast<uint8_t*>(rgba.data()),
           rgba.size(),
-          SPNG_FMT_RGBA8,
+          // Use IHDR-defined PNG output format for compatibility across libspng builds.
+          SPNG_FMT_PNG,
           SPNG_ENCODE_FINALIZE
         ); err != 0) {
       return make_libspng_error(Error::Code::PngEncodeFailed, ::spng_strerror(err));
