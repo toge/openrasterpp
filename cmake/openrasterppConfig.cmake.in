@@ -2,7 +2,7 @@
 
 include(CMakeFindDependencyMacro)
 
-set(_openrasterpp_supported_components core png-lodepng)
+set(_openrasterpp_supported_components core png-lodepng png-libspng)
 set(openrasterpp_FOUND TRUE)
 
 if(NOT openrasterpp_FIND_COMPONENTS)
@@ -24,6 +24,10 @@ endif()
 
 if(openrasterpp_FOUND AND "png-lodepng" IN_LIST openrasterpp_FIND_COMPONENTS)
   include("${CMAKE_CURRENT_LIST_DIR}/openrasterppConfig-png-lodepng.cmake")
+endif()
+
+if(openrasterpp_FOUND AND "png-libspng" IN_LIST openrasterpp_FIND_COMPONENTS)
+  include("${CMAKE_CURRENT_LIST_DIR}/openrasterppConfig-png-libspng.cmake")
 endif()
 
 check_required_components(openrasterpp)

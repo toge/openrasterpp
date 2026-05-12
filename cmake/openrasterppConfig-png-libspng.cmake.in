@@ -1,0 +1,7 @@
+include(CMakeFindDependencyMacro)
+
+find_dependency(SPNG CONFIG REQUIRED)
+
+include("${CMAKE_CURRENT_LIST_DIR}/openrasterppPngLibspngTargets.cmake")
+set(openrasterpp_png-libspng_FOUND TRUE)
+set(openrasterpp_png_libspng_FOUND TRUE)
