@@ -86,6 +86,28 @@ auto make_invalid_document() -> ora::OraDocument {
   };
 }
 
+auto valid_bmp_bytes() -> std::array<uint8_t, 58> {
+  return {
+    0x42, 0x4d, 0x3a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x36, 0x00, 0x00, 0x00,
+    0x28, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00,
+    0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x13, 0x0b, 0x00, 0x00,
+    0x13, 0x0b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x40,
+    0x80, 0x00
+  };
+}
+
+auto make_non_png_document() -> ora::OraDocument {
+  auto const bmp = valid_bmp_bytes();
+  return ora::OraDocument{
+    .width = 1,
+    .height = 1,
+    .root_nodes = {ora::layer("layer-1")},
+    .layer_images = {{"layer-1", {bmp.begin(), bmp.end()}}},
+    .merged_image_png = std::nullopt,
+    .thumbnail_png = std::nullopt
+  };
+}
+
 auto with_preview_assets(ora::OraDocument doc) -> ora::OraDocument {
   auto valid_doc = make_document();
   REQUIRE(ora::stb::render_preview_and_thumbnail(valid_doc).has_value());
@@ -194,6 +216,16 @@ TEST_CASE("stb backend rejects invalid layer png bytes during read", "[stb-backe
 
 TEST_CASE("stb backend rejects invalid layer png bytes during render", "[stb-backend]") {
   auto doc = make_invalid_document();
+
+  auto result = ora::stb::render_preview_and_thumbnail(doc);
+
+  REQUIRE_FALSE(result.has_value());
+  CHECK(result.error().code == ora::Error::Code::PngDecodeFailed);
+  CHECK(result.error().message.contains("stb"));
+}
+
+TEST_CASE("stb backend rejects valid non-png layer bytes during render", "[stb-backend]") {
+  auto doc = make_non_png_document();
 
   auto result = ora::stb::render_preview_and_thumbnail(doc);
 
