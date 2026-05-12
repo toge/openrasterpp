@@ -25,31 +25,31 @@ add_library(openrasterpp-core
     openraster.hpp
     src/core/archive_xml_provider.hpp
 )
-target_compile_features(openrasterpp-core PUBLIC cxx_std_23)
+target_compile_features(openrasterpp-core PUBLIC cxx_std_26)
 
 add_library(openrasterpp-png-lodepng
     src/backends/lodepng_backend.cpp
     openraster_lodepng.hpp
 )
-target_compile_features(openrasterpp-png-lodepng PUBLIC cxx_std_23)
+target_compile_features(openrasterpp-png-lodepng PUBLIC cxx_std_26)
 
 add_library(openrasterpp-png-libspng
     src/backends/libspng_backend.cpp
     openraster_libspng.hpp
 )
-target_compile_features(openrasterpp-png-libspng PUBLIC cxx_std_23)
+target_compile_features(openrasterpp-png-libspng PUBLIC cxx_std_26)
 
 add_library(openrasterpp-png-libpng
     src/backends/libpng_backend.cpp
     openraster_libpng.hpp
 )
-target_compile_features(openrasterpp-png-libpng PUBLIC cxx_std_23)
+target_compile_features(openrasterpp-png-libpng PUBLIC cxx_std_26)
 
 add_library(openrasterpp-png-stb
     src/backends/stb_backend.cpp
     openraster_stb.hpp
 )
-target_compile_features(openrasterpp-png-stb PUBLIC cxx_std_23)
+target_compile_features(openrasterpp-png-stb PUBLIC cxx_std_26)
 
 set(openrasterpp_install_cmakedir "${CMAKE_INSTALL_LIBDIR}/cmake/openrasterpp")
 
