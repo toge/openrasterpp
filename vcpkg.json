@@ -3,6 +3,7 @@
   "dependencies": [
     "catch2",
     "minizip-ng",
+    "libpng",
     "lodepng",
     "libspng"
   ]
