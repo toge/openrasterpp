@@ -24,10 +24,19 @@ target_link_libraries(libspng_backend_test PRIVATE
 target_compile_features(libspng_backend_test PRIVATE cxx_std_26)
 add_test(NAME libspng_backend_test COMMAND libspng_backend_test)
 
+add_executable(libpng_backend_test test_libpng_backend.cpp)
+target_link_libraries(libpng_backend_test PRIVATE
+  openrasterpp-png-libpng
+  Catch2::Catch2WithMain
+)
+target_compile_features(libpng_backend_test PRIVATE cxx_std_26)
+add_test(NAME libpng_backend_test COMMAND libpng_backend_test)
+
 set(install_smoke_prefix "${CMAKE_BINARY_DIR}/test/install-prefix")
 set(install_smoke_core_build_dir "${CMAKE_BINARY_DIR}/test/install-smoke-core")
 set(install_smoke_backend_build_dir "${CMAKE_BINARY_DIR}/test/install-smoke")
 set(install_smoke_libspng_build_dir "${CMAKE_BINARY_DIR}/test/install-smoke-libspng")
+set(install_smoke_libpng_build_dir "${CMAKE_BINARY_DIR}/test/install-smoke-libpng")
 set(install_smoke_prefix_path "${install_smoke_prefix}")
 if(CMAKE_PREFIX_PATH)
   string(APPEND install_smoke_prefix_path ";${CMAKE_PREFIX_PATH}")
@@ -41,6 +50,7 @@ add_test(
     "${install_smoke_core_build_dir}"
     "${install_smoke_backend_build_dir}"
     "${install_smoke_libspng_build_dir}"
+    "${install_smoke_libpng_build_dir}"
  )
 set_tests_properties(install_smoke_cleanup PROPERTIES
   FIXTURES_SETUP install_smoke_clean
@@ -155,6 +165,13 @@ add_install_smoke_configure_test(
   install_smoke_libspng_configured
 )
 
+add_install_smoke_configure_test(
+  install_smoke_libpng_configure
+  "${CMAKE_CURRENT_SOURCE_DIR}/install_smoke_libpng"
+  "${install_smoke_libpng_build_dir}"
+  install_smoke_libpng_configured
+)
+
 add_install_smoke_build_test(
   install_smoke_core_build
   "${install_smoke_core_build_dir}"
@@ -171,4 +188,10 @@ add_install_smoke_build_test(
   install_smoke_libspng_build
   "${install_smoke_libspng_build_dir}"
   install_smoke_libspng_configured
+)
+
+add_install_smoke_build_test(
+  install_smoke_libpng_build
+  "${install_smoke_libpng_build_dir}"
+  install_smoke_libpng_configured
 )
