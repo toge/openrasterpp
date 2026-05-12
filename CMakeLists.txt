@@ -65,7 +65,7 @@ target_link_libraries(openrasterpp-png-lodepng PUBLIC
 
 target_link_libraries(openrasterpp-png-libspng PUBLIC
     openrasterpp-core
-    spng::spng
+    $<IF:$<TARGET_EXISTS:spng::spng>,spng::spng,spng::spng_static>
 )
 
 write_basic_package_version_file(
