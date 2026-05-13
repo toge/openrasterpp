@@ -1,0 +1,7 @@
+include(CMakeFindDependencyMacro)
+
+find_dependency(fpng CONFIG REQUIRED)
+
+include("${CMAKE_CURRENT_LIST_DIR}/openrasterppPngFpngTargets.cmake")
+set(openrasterpp_png-fpng_FOUND TRUE)
+set(openrasterpp_png_fpng_FOUND TRUE)

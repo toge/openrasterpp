@@ -2,7 +2,23 @@
 
 include(CMakeFindDependencyMacro)
 
-set(_openrasterpp_supported_components core png-lodepng png-libspng png-libpng png-stb)
+set(_openrasterpp_supported_components core)
+if(@OPENRASTERPP_ENABLE_LODEPNG@)
+  list(APPEND _openrasterpp_supported_components png-lodepng)
+endif()
+if(@OPENRASTERPP_ENABLE_LIBSPNG@)
+  list(APPEND _openrasterpp_supported_components png-libspng)
+endif()
+if(@OPENRASTERPP_ENABLE_LIBPNG@)
+  list(APPEND _openrasterpp_supported_components png-libpng)
+endif()
+if(@OPENRASTERPP_ENABLE_STB@)
+  list(APPEND _openrasterpp_supported_components png-stb)
+endif()
+if(@OPENRASTERPP_ENABLE_FPNG@)
+  list(APPEND _openrasterpp_supported_components png-fpng)
+endif()
+
 set(openrasterpp_FOUND TRUE)
 
 if(NOT openrasterpp_FIND_COMPONENTS)
@@ -22,20 +38,24 @@ if(openrasterpp_FOUND)
   set(openrasterpp_core_FOUND TRUE)
 endif()
 
-if(openrasterpp_FOUND AND "png-lodepng" IN_LIST openrasterpp_FIND_COMPONENTS)
+if(openrasterpp_FOUND AND "png-lodepng" IN_LIST openrasterpp_FIND_COMPONENTS AND @OPENRASTERPP_ENABLE_LODEPNG@)
   include("${CMAKE_CURRENT_LIST_DIR}/openrasterppConfig-png-lodepng.cmake")
 endif()
 
-if(openrasterpp_FOUND AND "png-libspng" IN_LIST openrasterpp_FIND_COMPONENTS)
+if(openrasterpp_FOUND AND "png-libspng" IN_LIST openrasterpp_FIND_COMPONENTS AND @OPENRASTERPP_ENABLE_LIBSPNG@)
   include("${CMAKE_CURRENT_LIST_DIR}/openrasterppConfig-png-libspng.cmake")
 endif()
 
-if(openrasterpp_FOUND AND "png-libpng" IN_LIST openrasterpp_FIND_COMPONENTS)
+if(openrasterpp_FOUND AND "png-libpng" IN_LIST openrasterpp_FIND_COMPONENTS AND @OPENRASTERPP_ENABLE_LIBPNG@)
   include("${CMAKE_CURRENT_LIST_DIR}/openrasterppConfig-png-libpng.cmake")
 endif()
 
-if(openrasterpp_FOUND AND "png-stb" IN_LIST openrasterpp_FIND_COMPONENTS)
+if(openrasterpp_FOUND AND "png-stb" IN_LIST openrasterpp_FIND_COMPONENTS AND @OPENRASTERPP_ENABLE_STB@)
   include("${CMAKE_CURRENT_LIST_DIR}/openrasterppConfig-png-stb.cmake")
+endif()
+
+if(openrasterpp_FOUND AND "png-fpng" IN_LIST openrasterpp_FIND_COMPONENTS AND @OPENRASTERPP_ENABLE_FPNG@)
+  include("${CMAKE_CURRENT_LIST_DIR}/openrasterppConfig-png-fpng.cmake")
 endif()
 
 check_required_components(openrasterpp)

@@ -6,6 +6,7 @@
     "libpng",
     "lodepng",
     "libspng",
-    "stb"
+    "stb",
+    "fpng"
   ]
 }

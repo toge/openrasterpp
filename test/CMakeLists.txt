@@ -8,38 +8,60 @@ target_link_libraries(core_test PRIVATE
 target_compile_features(core_test PRIVATE cxx_std_26)
 add_test(NAME core_test COMMAND core_test)
 
-add_executable(lodepng_backend_test test_lodepng_backend.cpp)
-target_link_libraries(lodepng_backend_test PRIVATE
-  openrasterpp-png-lodepng
-  Catch2::Catch2WithMain
-)
-target_compile_features(lodepng_backend_test PRIVATE cxx_std_26)
-add_test(NAME lodepng_backend_test COMMAND lodepng_backend_test)
+if(OPENRASTERPP_ENABLE_LODEPNG)
+  add_executable(lodepng_backend_test test_lodepng_backend.cpp)
+  target_link_libraries(lodepng_backend_test PRIVATE
+    openrasterpp-png-lodepng
+    Catch2::Catch2WithMain
+  )
+  target_compile_features(lodepng_backend_test PRIVATE cxx_std_26)
+  add_test(NAME lodepng_backend_test COMMAND lodepng_backend_test)
+endif()
 
-add_executable(libspng_backend_test test_libspng_backend.cpp)
-target_link_libraries(libspng_backend_test PRIVATE
-  openrasterpp-png-libspng
-  Catch2::Catch2WithMain
-)
-target_compile_features(libspng_backend_test PRIVATE cxx_std_26)
-add_test(NAME libspng_backend_test COMMAND libspng_backend_test)
+if(OPENRASTERPP_ENABLE_LIBSPNG)
+  add_executable(libspng_backend_test test_libspng_backend.cpp)
+  target_link_libraries(libspng_backend_test PRIVATE
+    openrasterpp-png-libspng
+    Catch2::Catch2WithMain
+  )
+  target_compile_features(libspng_backend_test PRIVATE cxx_std_26)
+  add_test(NAME libspng_backend_test COMMAND libspng_backend_test)
+endif()
 
-add_executable(libpng_backend_test test_libpng_backend.cpp)
-target_link_libraries(libpng_backend_test PRIVATE
-  openrasterpp-png-libpng
-  Catch2::Catch2WithMain
-)
-target_compile_features(libpng_backend_test PRIVATE cxx_std_26)
-add_test(NAME libpng_backend_test COMMAND libpng_backend_test)
+if(OPENRASTERPP_ENABLE_LIBPNG)
+  add_executable(libpng_backend_test test_libpng_backend.cpp)
+  target_link_libraries(libpng_backend_test PRIVATE
+    openrasterpp-png-libpng
+    Catch2::Catch2WithMain
+  )
+  target_compile_features(libpng_backend_test PRIVATE cxx_std_26)
+  add_test(NAME libpng_backend_test COMMAND libpng_backend_test)
+endif()
 
-add_executable(stb_backend_test test_stb_backend.cpp)
-target_link_libraries(stb_backend_test PRIVATE
-  openrasterpp-png-stb
-  PNG::PNG
-  Catch2::Catch2WithMain
-)
-target_compile_features(stb_backend_test PRIVATE cxx_std_26)
-add_test(NAME stb_backend_test COMMAND stb_backend_test)
+if(OPENRASTERPP_ENABLE_STB)
+  # stb_backend_test uses libpng for verification
+  if(OPENRASTERPP_ENABLE_LIBPNG)
+    add_executable(stb_backend_test test_stb_backend.cpp)
+    target_link_libraries(stb_backend_test PRIVATE
+      openrasterpp-png-stb
+      PNG::PNG
+      Catch2::Catch2WithMain
+    )
+    target_compile_features(stb_backend_test PRIVATE cxx_std_26)
+    add_test(NAME stb_backend_test COMMAND stb_backend_test)
+  endif()
+endif()
+
+
+if(OPENRASTERPP_ENABLE_FPNG)
+  add_executable(fpng_backend_test test_fpng_backend.cpp)
+  target_link_libraries(fpng_backend_test PRIVATE
+    openrasterpp-png-fpng
+    Catch2::Catch2WithMain
+  )
+  target_compile_features(fpng_backend_test PRIVATE cxx_std_26)
+  add_test(NAME fpng_backend_test COMMAND fpng_backend_test)
+endif()
 
 set(install_smoke_prefix "${CMAKE_BINARY_DIR}/test/install-prefix")
 set(install_smoke_core_build_dir "${CMAKE_BINARY_DIR}/test/install-smoke-core")
@@ -179,33 +201,41 @@ add_install_smoke_configure_test(
   install_smoke_core_configured
 )
 
-add_install_smoke_configure_test(
-  install_smoke_backend_configure
-  "${CMAKE_CURRENT_SOURCE_DIR}/install_smoke"
-  "${install_smoke_backend_build_dir}"
-  install_smoke_backend_configured
-)
+if(OPENRASTERPP_ENABLE_LODEPNG)
+  add_install_smoke_configure_test(
+    install_smoke_backend_configure
+    "${CMAKE_CURRENT_SOURCE_DIR}/install_smoke"
+    "${install_smoke_backend_build_dir}"
+    install_smoke_backend_configured
+  )
+endif()
 
-add_install_smoke_configure_test(
-  install_smoke_libspng_configure
-  "${CMAKE_CURRENT_SOURCE_DIR}/install_smoke_libspng"
-  "${install_smoke_libspng_build_dir}"
-  install_smoke_libspng_configured
-)
+if(OPENRASTERPP_ENABLE_LIBSPNG)
+  add_install_smoke_configure_test(
+    install_smoke_libspng_configure
+    "${CMAKE_CURRENT_SOURCE_DIR}/install_smoke_libspng"
+    "${install_smoke_libspng_build_dir}"
+    install_smoke_libspng_configured
+  )
+endif()
 
-add_install_smoke_configure_test(
-  install_smoke_libpng_configure
-  "${CMAKE_CURRENT_SOURCE_DIR}/install_smoke_libpng"
-  "${install_smoke_libpng_build_dir}"
-  install_smoke_libpng_configured
-)
+if(OPENRASTERPP_ENABLE_LIBPNG)
+  add_install_smoke_configure_test(
+    install_smoke_libpng_configure
+    "${CMAKE_CURRENT_SOURCE_DIR}/install_smoke_libpng"
+    "${install_smoke_libpng_build_dir}"
+    install_smoke_libpng_configured
+  )
+endif()
 
-add_install_smoke_configure_test(
-  install_smoke_stb_configure
-  "${CMAKE_CURRENT_SOURCE_DIR}/install_smoke_stb"
-  "${install_smoke_stb_build_dir}"
-  install_smoke_stb_configured
-)
+if(OPENRASTERPP_ENABLE_STB)
+  add_install_smoke_configure_test(
+    install_smoke_stb_configure
+    "${CMAKE_CURRENT_SOURCE_DIR}/install_smoke_stb"
+    "${install_smoke_stb_build_dir}"
+    install_smoke_stb_configured
+  )
+endif()
 
 add_install_smoke_build_test(
   install_smoke_core_build
@@ -213,36 +243,45 @@ add_install_smoke_build_test(
   install_smoke_core_configured
 )
 
-add_install_smoke_build_test(
-  install_smoke_backend_build
-  "${install_smoke_backend_build_dir}"
-  install_smoke_backend_configured
-)
+if(OPENRASTERPP_ENABLE_LODEPNG)
+  add_install_smoke_build_test(
+    install_smoke_backend_build
+    "${install_smoke_backend_build_dir}"
+    install_smoke_backend_configured
+  )
+endif()
 
-add_install_smoke_build_test(
-  install_smoke_libspng_build
-  "${install_smoke_libspng_build_dir}"
-  install_smoke_libspng_configured
-)
+if(OPENRASTERPP_ENABLE_LIBSPNG)
+  add_install_smoke_build_test(
+    install_smoke_libspng_build
+    "${install_smoke_libspng_build_dir}"
+    install_smoke_libspng_configured
+  )
+endif()
 
-add_install_smoke_build_test(
-  install_smoke_libpng_build
-  "${install_smoke_libpng_build_dir}"
-  install_smoke_libpng_configured
-)
+if(OPENRASTERPP_ENABLE_LIBPNG)
+  add_install_smoke_build_test(
+    install_smoke_libpng_build
+    "${install_smoke_libpng_build_dir}"
+    install_smoke_libpng_configured
+  )
+endif()
 
-add_install_smoke_build_test(
-  install_smoke_stb_build
-  "${install_smoke_stb_build_dir}"
-  install_smoke_stb_configured
-)
-set_tests_properties(install_smoke_stb_build PROPERTIES
-  FIXTURES_SETUP install_smoke_stb_built
-)
+if(OPENRASTERPP_ENABLE_STB)
+  add_install_smoke_build_test(
+    install_smoke_stb_build
+    "${install_smoke_stb_build_dir}"
+    install_smoke_stb_configured
+  )
+  set_tests_properties(install_smoke_stb_build PROPERTIES
+    FIXTURES_SETUP install_smoke_stb_built
+  )
 
-add_install_smoke_run_test(
-  install_smoke_stb_run
-  "${install_smoke_stb_build_dir}"
-  install_smoke_stb_built
-  install_smoke_stb
-)
+  add_install_smoke_run_test(
+    install_smoke_stb_run
+    "${install_smoke_stb_build_dir}"
+    install_smoke_stb_built
+    install_smoke_stb
+  )
+endif()
+
