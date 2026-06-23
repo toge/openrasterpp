@@ -3,19 +3,11 @@
 #include <algorithm>
 #include <array>
 #include <filesystem>
-#include <span>
 #include <string>
-#include <vector>
 
 #include "openraster_fpng.hpp"
 
 namespace {
-
-struct DecodedPng {
-  unsigned int width;
-  unsigned int height;
-  std::vector<uint8_t> rgba;
-};
 
 auto reference_rgba() -> std::array<uint8_t, 16> {
   return {
@@ -24,25 +16,6 @@ auto reference_rgba() -> std::array<uint8_t, 16> {
     10, 20, 30, 40,
     250, 251, 252, 1
   };
-}
-
-// Use fpng for decoding in the test as well
-auto decode_png_rgba(std::span<const uint8_t> png_bytes) -> DecodedPng {
-  unsigned int width = 0;
-  unsigned int height = 0;
-  unsigned int channels = 0;
-  std::vector<uint8_t> rgba;
-  
-  // fpng is already initialized in the backend constructor, 
-  // but we can call it here too just in case.
-  // Actually, we'll rely on the backend test.
-  
-  ora::fpng::FpngOraProvider provider; // Internal but let's assume we test through public API
-  
-  auto decoded = ora::fpng::encode_png(ora::ImageBuffer::create(2, 2, std::vector<uint8_t>(reference_rgba().begin(), reference_rgba().end())).value());
-  // Wait, I need a decoder. Let's use the one in the backend via read/write or internal access if possible.
-  // For simplicity, since fpng_decode_memory is available:
-  return {}; // Placeholder, see below
 }
 
 auto make_reference_image() -> ora::ImageBuffer {

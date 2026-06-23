@@ -30,12 +30,12 @@ public:
   }
 
   auto decode_png(std::span<const uint8_t> data) -> std::expected<DecodedImage, Error> {
-    unsigned int width = 0;
-    unsigned int height = 0;
-    unsigned int channels = 0;
+    uint32_t width = 0;
+    uint32_t height = 0;
+    uint32_t channels = 0;
     std::vector<uint8_t> rgba;
 
-    int const result = ::fpng::fpng_decode_memory(data.data(), static_cast<uint32_t>(data.size()), width, height, channels, rgba, 4);
+    int const result = ::fpng::fpng_decode_memory(data.data(), static_cast<uint32_t>(data.size()), rgba, width, height, channels, 4);
     if (result != ::fpng::FPNG_DECODE_SUCCESS) {
       return detail::make_unexpected(Error::Code::PngDecodeFailed, "fpng", "error code: " + std::to_string(result));
     }
