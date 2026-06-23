@@ -5,7 +5,7 @@ target_link_libraries(core_test PRIVATE
   openrasterpp-core
   Catch2::Catch2WithMain
 )
-target_compile_features(core_test PRIVATE cxx_std_26)
+target_compile_features(core_test PRIVATE cxx_std_23)
 add_test(NAME core_test COMMAND core_test)
 
 if(OPENRASTERPP_ENABLE_LODEPNG)
@@ -14,7 +14,7 @@ if(OPENRASTERPP_ENABLE_LODEPNG)
     openrasterpp-png-lodepng
     Catch2::Catch2WithMain
   )
-  target_compile_features(lodepng_backend_test PRIVATE cxx_std_26)
+  target_compile_features(lodepng_backend_test PRIVATE cxx_std_23)
   add_test(NAME lodepng_backend_test COMMAND lodepng_backend_test)
 endif()
 
@@ -24,7 +24,7 @@ if(OPENRASTERPP_ENABLE_LIBSPNG)
     openrasterpp-png-libspng
     Catch2::Catch2WithMain
   )
-  target_compile_features(libspng_backend_test PRIVATE cxx_std_26)
+  target_compile_features(libspng_backend_test PRIVATE cxx_std_23)
   add_test(NAME libspng_backend_test COMMAND libspng_backend_test)
 endif()
 
@@ -34,7 +34,7 @@ if(OPENRASTERPP_ENABLE_LIBPNG)
     openrasterpp-png-libpng
     Catch2::Catch2WithMain
   )
-  target_compile_features(libpng_backend_test PRIVATE cxx_std_26)
+  target_compile_features(libpng_backend_test PRIVATE cxx_std_23)
   add_test(NAME libpng_backend_test COMMAND libpng_backend_test)
 endif()
 
@@ -47,7 +47,7 @@ if(OPENRASTERPP_ENABLE_STB)
       PNG::PNG
       Catch2::Catch2WithMain
     )
-    target_compile_features(stb_backend_test PRIVATE cxx_std_26)
+    target_compile_features(stb_backend_test PRIVATE cxx_std_23)
     add_test(NAME stb_backend_test COMMAND stb_backend_test)
   endif()
 endif()
@@ -59,7 +59,7 @@ if(OPENRASTERPP_ENABLE_FPNG)
     openrasterpp-png-fpng
     Catch2::Catch2WithMain
   )
-  target_compile_features(fpng_backend_test PRIVATE cxx_std_26)
+  target_compile_features(fpng_backend_test PRIVATE cxx_std_23)
   add_test(NAME fpng_backend_test COMMAND fpng_backend_test)
 endif()
 

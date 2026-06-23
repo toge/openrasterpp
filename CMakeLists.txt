@@ -1,13 +1,13 @@
 cmake_minimum_required(VERSION 3.25)
 project(openrasterpp VERSION 0.1.0 LANGUAGES CXX)
 
-option(ENABLE_TESTS "Enable tests" ON)
+option(BUILD_TEST "Enable tests" ON)
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
 # C++ Standard
-set(CMAKE_CXX_STANDARD 26)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -47,14 +47,14 @@ add_library(openrasterpp-core
     openraster.hpp
     src/core/archive_xml_provider.hpp
 )
-target_compile_features(openrasterpp-core PUBLIC cxx_std_26)
+target_compile_features(openrasterpp-core PUBLIC cxx_std_23)
 
 if(OPENRASTERPP_ENABLE_LODEPNG)
     add_library(openrasterpp-png-lodepng
         src/backends/lodepng_backend.cpp
         openraster_lodepng.hpp
     )
-    target_compile_features(openrasterpp-png-lodepng PUBLIC cxx_std_26)
+    target_compile_features(openrasterpp-png-lodepng PUBLIC cxx_std_23)
 endif()
 
 if(OPENRASTERPP_ENABLE_LIBSPNG)
@@ -62,7 +62,7 @@ if(OPENRASTERPP_ENABLE_LIBSPNG)
         src/backends/libspng_backend.cpp
         openraster_libspng.hpp
     )
-    target_compile_features(openrasterpp-png-libspng PUBLIC cxx_std_26)
+    target_compile_features(openrasterpp-png-libspng PUBLIC cxx_std_23)
 endif()
 
 if(OPENRASTERPP_ENABLE_LIBPNG)
@@ -70,7 +70,7 @@ if(OPENRASTERPP_ENABLE_LIBPNG)
         src/backends/libpng_backend.cpp
         openraster_libpng.hpp
     )
-    target_compile_features(openrasterpp-png-libpng PUBLIC cxx_std_26)
+    target_compile_features(openrasterpp-png-libpng PUBLIC cxx_std_23)
 endif()
 
 if(OPENRASTERPP_ENABLE_STB)
@@ -78,7 +78,7 @@ if(OPENRASTERPP_ENABLE_STB)
         src/backends/stb_backend.cpp
         openraster_stb.hpp
     )
-    target_compile_features(openrasterpp-png-stb PUBLIC cxx_std_26)
+    target_compile_features(openrasterpp-png-stb PUBLIC cxx_std_23)
 endif()
 
 if(OPENRASTERPP_ENABLE_FPNG)
@@ -86,7 +86,7 @@ if(OPENRASTERPP_ENABLE_FPNG)
         src/backends/fpng_backend.cpp
         openraster_fpng.hpp
     )
-    target_compile_features(openrasterpp-png-fpng PUBLIC cxx_std_26)
+    target_compile_features(openrasterpp-png-fpng PUBLIC cxx_std_23)
 endif()
 
 set(openrasterpp_install_cmakedir "${CMAKE_INSTALL_LIBDIR}/cmake/openrasterpp")
@@ -454,7 +454,7 @@ endif()
 
 
 # Tests
-if(ENABLE_TESTS)
+if(BUILD_TEST)
     enable_testing()
     add_subdirectory(test)
 endif()
