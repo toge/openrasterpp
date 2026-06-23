@@ -10,7 +10,7 @@
       "baseline": "2e26d1302728089abd09a20d9ce99674a8edcf81",
       "repository": "https://github.com/toge/my-vcpkg-ports",
       "packages": [
-        "*"
+        "fpng"
       ]
     }
   ]
