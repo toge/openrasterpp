@@ -1,13 +1,13 @@
 {
   "default-registry": {
     "kind": "git",
-    "baseline": "8defa4b8bc4c35071c678e87a0e140dd433489bb",
+    "baseline": "a7eda31dc16994fcaa8587982eb833a8695f1b6f",
     "repository": "https://github.com/microsoft/vcpkg"
   },
   "registries": [
     {
       "kind": "git",
-      "baseline": "e46047a6a206ec0a7d6b67c44197b475de4073fd",
+      "baseline": "2e26d1302728089abd09a20d9ce99674a8edcf81",
       "repository": "https://github.com/toge/my-vcpkg-ports",
       "packages": [
         "*"
