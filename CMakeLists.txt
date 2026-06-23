@@ -13,7 +13,16 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Dependencies
-find_package(Threads REQUIRED)
+# CMake < 3.29 FindThreads may fail its compile test on some toolchains (e.g. clang 19 / Fedora 41).
+# Try QUIET first; if detection fails, create the target manually.
+find_package(Threads QUIET)
+if(NOT Threads_FOUND)
+  add_library(Threads::Threads INTERFACE IMPORTED)
+  set_target_properties(Threads::Threads PROPERTIES
+    INTERFACE_LINK_LIBRARIES "-pthread"
+  )
+  set(Threads_FOUND TRUE)
+endif()
 find_package(minizip-ng CONFIG REQUIRED)
 
 option(OPENRASTERPP_ENABLE_LODEPNG "Enable lodepng backend" ON)
