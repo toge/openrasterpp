@@ -13,6 +13,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Dependencies
+find_package(Threads REQUIRED)
 find_package(minizip-ng CONFIG REQUIRED)
 
 option(OPENRASTERPP_ENABLE_LODEPNG "Enable lodepng backend" ON)

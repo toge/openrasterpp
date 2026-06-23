@@ -21,4 +21,4 @@ endif()
 
 add_executable(install_smoke_stb main.cpp)
 target_link_libraries(install_smoke_stb PRIVATE openrasterpp::openrasterpp-png-stb)
-target_compile_features(install_smoke_stb PRIVATE cxx_std_26)
+target_compile_features(install_smoke_stb PRIVATE cxx_std_23)

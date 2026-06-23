@@ -5,7 +5,7 @@ find_package(openrasterpp CONFIG REQUIRED COMPONENTS core)
 
 add_executable(install_smoke_core main.cpp)
 target_link_libraries(install_smoke_core PRIVATE openrasterpp::openrasterpp-core)
-target_compile_features(install_smoke_core PRIVATE cxx_std_26)
+target_compile_features(install_smoke_core PRIVATE cxx_std_23)
 
 get_target_property(core_links openrasterpp::openrasterpp-core INTERFACE_LINK_LIBRARIES)
 get_target_property(core_includes openrasterpp::openrasterpp-core INTERFACE_INCLUDE_DIRECTORIES)
