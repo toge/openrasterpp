@@ -38,7 +38,7 @@ if(OPENRASTERPP_ENABLE_STB)
 endif()
 
 if(OPENRASTERPP_ENABLE_FPNG)
-    find_package(fpng CONFIG REQUIRED)
+    find_package(unofficial-fpng CONFIG REQUIRED)
 endif()
 
 # Libraries
@@ -167,7 +167,7 @@ endif()
 if(OPENRASTERPP_ENABLE_FPNG)
     target_link_libraries(openrasterpp-png-fpng PUBLIC
         openrasterpp-core
-        fpng::fpng
+        unofficial::fpng::fpng
     )
 endif()
 
