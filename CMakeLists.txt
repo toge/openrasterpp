@@ -13,15 +13,17 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Dependencies
-# CMake < 3.29 FindThreads may fail its compile test on some toolchains (e.g. clang 19 / Fedora 41).
-# Try QUIET first; if detection fails, create the target manually.
+# Workaround: FindThreads compile-test may fail on older toolchains (e.g. clang 19 / Fedora 41).
+# Probe QUIET; on failure, force-cache the result so find_dependency() from downstream configs skips re-detection.
 find_package(Threads QUIET)
 if(NOT Threads_FOUND)
+  set(CMAKE_THREAD_LIBS_INIT "-pthread" CACHE STRING "" FORCE)
+  set(THREADS_FOUND TRUE CACHE BOOL "" FORCE)
+  set(Threads_FOUND TRUE CACHE BOOL "" FORCE)
   add_library(Threads::Threads INTERFACE IMPORTED)
   set_target_properties(Threads::Threads PROPERTIES
     INTERFACE_LINK_LIBRARIES "-pthread"
   )
-  set(Threads_FOUND TRUE)
 endif()
 find_package(minizip-ng CONFIG REQUIRED)
 
