@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.25)
 project(openrasterpp VERSION 0.1.0 LANGUAGES CXX)
 
+# WASI では lodepng C API ラッパー（C ソース）をビルドするため C を有効化。
+# 既存環境では CXX のみで変化なし。
+if(CMAKE_SYSTEM_NAME STREQUAL "WASI")
+  enable_language(C)
+endif()
+
 option(BUILD_TEST "Enable tests" ON)
 
 include(GNUInstallDirs)
@@ -13,6 +19,36 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Dependencies
+# WASI (wasip1) ではスレッド・例外・一部依存が使えないため、検出して既定値を切り替える。
+# 既存の Linux/macOS/Windows 環境の動作は変えない。
+if(CMAKE_SYSTEM_NAME STREQUAL "WASI")
+  set(OPENRASTERPP_WASI ON)
+else()
+  set(OPENRASTERPP_WASI OFF)
+endif()
+
+# WASI では libpng/libspng/fpng を既定 OFF（libpng は zlib+setjmp 系、fpng は mutex で問題が出る）。
+# lodepng/stb はヘッダ主体で WASI 親和性が高い。必要なら -D で明示 ON 可能。
+option(OPENRASTERPP_ENABLE_LODEPNG "Enable lodepng backend" ON)
+option(OPENRASTERPP_ENABLE_LIBSPNG "Enable libspng backend" ON)
+option(OPENRASTERPP_ENABLE_LIBPNG "Enable libpng backend" ON)
+option(OPENRASTERPP_ENABLE_STB "Enable stb_image backend" ON)
+option(OPENRASTERPP_ENABLE_FPNG "Enable fpng backend" ON)
+if(OPENRASTERPP_WASI)
+  set(OPENRASTERPP_ENABLE_LIBSPNG OFF CACHE BOOL "Enable libspng backend" FORCE)
+  set(OPENRASTERPP_ENABLE_LIBPNG OFF CACHE BOOL "Enable libpng backend" FORCE)
+  set(OPENRASTERPP_ENABLE_FPNG OFF CACHE BOOL "Enable fpng backend" FORCE)
+endif()
+
+# WASI では Threads 検出を行わない（pthread 前提の -pthread リンクを避ける）。
+if(OPENRASTERPP_WASI)
+  set(CMAKE_THREAD_LIBS_INIT "" CACHE STRING "" FORCE)
+  set(THREADS_FOUND TRUE CACHE BOOL "" FORCE)
+  set(Threads_FOUND TRUE CACHE BOOL "" FORCE)
+  if(NOT TARGET Threads::Threads)
+    add_library(Threads::Threads INTERFACE IMPORTED)
+  endif()
+else()
 # Workaround: FindThreads compile-test may fail on older toolchains (e.g. clang 19 / Fedora 41).
 # Probe QUIET; on failure, force-cache the result so find_dependency() from downstream configs skips re-detection.
 find_package(Threads QUIET)
@@ -25,13 +61,15 @@ if(NOT Threads_FOUND)
     INTERFACE_LINK_LIBRARIES "-pthread"
   )
 endif()
-find_package(minizip-ng CONFIG REQUIRED)
+endif()
 
-option(OPENRASTERPP_ENABLE_LODEPNG "Enable lodepng backend" ON)
-option(OPENRASTERPP_ENABLE_LIBSPNG "Enable libspng backend" ON)
-option(OPENRASTERPP_ENABLE_LIBPNG "Enable libpng backend" ON)
-option(OPENRASTERPP_ENABLE_STB "Enable stb_image backend" ON)
-option(OPENRASTERPP_ENABLE_FPNG "Enable fpng backend" ON)
+# WASI 用の ZIP 実装選択: 内蔵実装（zlib 直利用）のため minizip 不要。
+# 既存環境では従来通り minizip-ng を使う。
+if(NOT OPENRASTERPP_WASI)
+  find_package(minizip-ng CONFIG REQUIRED)
+endif()
+
+find_package(FastFloat CONFIG REQUIRED)
 
 if(OPENRASTERPP_ENABLE_LODEPNG)
     find_package(lodepng CONFIG REQUIRED)
@@ -59,6 +97,17 @@ add_library(openrasterpp-core
     openraster.hpp
     src/core/archive_xml_provider.hpp
 )
+if(OPENRASTERPP_WASI)
+    # WASI 内蔵 ZIP 実装。zlib 直利用のため ZLIB を探す。
+    # target 名は環境差あり（ZLIB::ZLIB / ZLIB::ZLIBSTATIC）。
+    target_sources(openrasterpp-core PRIVATE src/core/zip_wasi.cpp)
+    find_package(ZLIB REQUIRED)
+    if(TARGET ZLIB::ZLIB)
+        target_link_libraries(openrasterpp-core PUBLIC ZLIB::ZLIB)
+    else()
+        target_link_libraries(openrasterpp-core PUBLIC ZLIB::ZLIBSTATIC)
+    endif()
+endif()
 target_compile_features(openrasterpp-core PUBLIC cxx_std_23)
 
 if(OPENRASTERPP_ENABLE_LODEPNG)
@@ -67,6 +116,10 @@ if(OPENRASTERPP_ENABLE_LODEPNG)
         openraster_lodepng.hpp
     )
     target_compile_features(openrasterpp-png-lodepng PUBLIC cxx_std_23)
+    if(OPENRASTERPP_WASI)
+        # C リンケージのラッパーを同梱（lodepng-c 実体への橋渡し）。
+        target_sources(openrasterpp-png-lodepng PRIVATE src/backends/lodepng_c_wrap.c)
+    endif()
 endif()
 
 if(OPENRASTERPP_ENABLE_LIBSPNG)
@@ -144,15 +197,33 @@ if(OPENRASTERPP_ENABLE_FPNG)
     )
 endif()
 
-target_link_libraries(openrasterpp-core PUBLIC
-    MINIZIP::minizip-ng
+if(NOT OPENRASTERPP_WASI)
+  # 既存環境は従来通り minizip-ng。WASI は内蔵 ZIP 実装のため不要。
+  target_link_libraries(openrasterpp-core PUBLIC
+      MINIZIP::minizip-ng
+  )
+endif()
+
+# 数値パースに fast_float を使う（ヘッダオンリー、例外なし）。
+# 実体は openraster_core.cpp 側に閉じるため PRIVATE でよい。
+target_link_libraries(openrasterpp-core PRIVATE
+    FastFloat::fast_float
 )
 
 if(OPENRASTERPP_ENABLE_LODEPNG)
+  if(OPENRASTERPP_WASI)
+    # WASI では例外なしで使える C API 版を使う（C++ 版は __cxa_throw を参照する）。
+    find_package(lodepng-c CONFIG REQUIRED)
+    target_link_libraries(openrasterpp-png-lodepng PUBLIC
+        openrasterpp-core
+        lodepng-c
+    )
+  else()
     target_link_libraries(openrasterpp-png-lodepng PUBLIC
         openrasterpp-core
         lodepng
     )
+  endif()
 endif()
 
 if(OPENRASTERPP_ENABLE_LIBSPNG)
@@ -446,21 +517,34 @@ if(MSVC)
         target_compile_options(openrasterpp-png-fpng PRIVATE /W4 /Ox)
     endif()
 else()
-    target_compile_options(openrasterpp-core PRIVATE -Wall -Wextra -pedantic -O3 -march=native)
+    # WASI では -march=native が未対応のため外す。既存環境は従来通り。
+    if(OPENRASTERPP_WASI)
+      set(OPENRASTERPP_OPT_FLAGS -Wall -Wextra -pedantic -O3)
+    else()
+      set(OPENRASTERPP_OPT_FLAGS -Wall -Wextra -pedantic -O3 -march=native)
+    endif()
+    if(OPENRASTERPP_WASI)
+      # WASI/wasmedge では C++ 例外が使えないため、ライブラリ全体を例外なしで統一する。
+      # STL 内部の throw 参照も消える。既存環境には影響しない。
+      set(OPENRASTERPP_WASI_FLAGS -fno-exceptions)
+    else()
+      set(OPENRASTERPP_WASI_FLAGS)
+    endif()
+    target_compile_options(openrasterpp-core PRIVATE ${OPENRASTERPP_OPT_FLAGS} ${OPENRASTERPP_WASI_FLAGS})
     if(OPENRASTERPP_ENABLE_LODEPNG)
-        target_compile_options(openrasterpp-png-lodepng PRIVATE -Wall -Wextra -pedantic -O3 -march=native)
+        target_compile_options(openrasterpp-png-lodepng PRIVATE ${OPENRASTERPP_OPT_FLAGS} ${OPENRASTERPP_WASI_FLAGS})
     endif()
     if(OPENRASTERPP_ENABLE_LIBSPNG)
-        target_compile_options(openrasterpp-png-libspng PRIVATE -Wall -Wextra -pedantic -O3 -march=native)
+        target_compile_options(openrasterpp-png-libspng PRIVATE ${OPENRASTERPP_OPT_FLAGS} ${OPENRASTERPP_WASI_FLAGS})
     endif()
     if(OPENRASTERPP_ENABLE_LIBPNG)
-        target_compile_options(openrasterpp-png-libpng PRIVATE -Wall -Wextra -pedantic -O3 -march=native)
+        target_compile_options(openrasterpp-png-libpng PRIVATE ${OPENRASTERPP_OPT_FLAGS} ${OPENRASTERPP_WASI_FLAGS})
     endif()
     if(OPENRASTERPP_ENABLE_STB)
-        target_compile_options(openrasterpp-png-stb PRIVATE -Wall -Wextra -pedantic -O3 -march=native)
+        target_compile_options(openrasterpp-png-stb PRIVATE ${OPENRASTERPP_OPT_FLAGS} ${OPENRASTERPP_WASI_FLAGS})
     endif()
     if(OPENRASTERPP_ENABLE_FPNG)
-        target_compile_options(openrasterpp-png-fpng PRIVATE -Wall -Wextra -pedantic -O3 -march=native)
+        target_compile_options(openrasterpp-png-fpng PRIVATE ${OPENRASTERPP_OPT_FLAGS} ${OPENRASTERPP_WASI_FLAGS})
     endif()
 endif()
 

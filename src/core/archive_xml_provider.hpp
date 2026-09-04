@@ -3,8 +3,14 @@
 
 #include "openraster.hpp"
 
+#if defined(__wasi__)
+// WASI では minizip(-ng) が動作しないため、zlib 直利用の内蔵 ZIP 実装を使う。
+// minizip ヘッダは不要。既存環境（Linux/macOS/Windows）には影響しない。
+#include <map>
+#else
 #include "unzip.h"
 #include "zip.h"
+#endif
 
 namespace ora::detail {
 
@@ -28,8 +34,17 @@ public:
   auto deserialize_stack(std::span<const uint8_t> xml_bytes) -> std::expected<OraDocument, Error>;
 
 private:
+#if defined(__wasi__)
+  std::string archive_path_;
+  ArchiveMode archive_mode_ = ArchiveMode::Read;
+  // 書き込み時に集めたエントリ。close 時に一括で ZIP 化する。
+  std::map<std::string, std::vector<uint8_t>, std::less<>> pending_entries_;
+  // 読み込み時にメモリへ展開した ZIP 全体。
+  std::vector<uint8_t> archive_bytes_;
+#else
   unzFile unzip_ = nullptr;
   zipFile zip_ = nullptr;
+#endif
 };
 
 } // namespace ora::detail

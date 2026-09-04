@@ -2,6 +2,7 @@
   "name": "openrasterpp",
   "dependencies": [
     "catch2",
+    "fast-float",
     "minizip-ng",
     "libpng",
     "lodepng",

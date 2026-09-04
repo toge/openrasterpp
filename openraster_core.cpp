@@ -5,6 +5,8 @@
 
 #include "src/core/archive_xml_provider.hpp"
 
+#include "fast_float/fast_float.h"
+
 #include <cctype>
 #include <array>
 #include <algorithm>
@@ -16,7 +18,6 @@
 #include <iostream>
 #include <limits>
 #include <sstream>
-#include <stdexcept>
 #include <set>
 #include <tuple>
 #include <utility>
@@ -323,6 +324,39 @@ auto parse_next_tag(std::string_view xml, size_t& pos) -> std::optional<xml_tag>
 
 namespace detail {
 
+/**
+ * @brief `fast_float` で全消費パースできた場合のみ値を返します。
+ */
+template<typename T>
+auto parse_number(std::string_view str) -> std::optional<T> {
+  if (str.empty()) {
+    return std::nullopt;
+  }
+  auto value = T{};
+  auto const options = fast_float::parse_options_t<char>{
+      fast_float::chars_format::general | fast_float::chars_format::allow_leading_plus};
+  auto const result = fast_float::from_chars_advanced(str.data(), str.data() + str.size(), value, options);
+  if (result.ec != std::errc() || result.ptr != str.data() + str.size()) {
+    return std::nullopt;
+  }
+  return value;
+}
+
+auto parse_uint(std::string_view str) -> std::optional<unsigned long> {
+  return parse_number<unsigned long>(str);
+}
+
+auto parse_int(std::string_view str) -> std::optional<int> {
+  return parse_number<int>(str);
+}
+
+auto parse_float(std::string_view str) -> std::optional<float> {
+  return parse_number<float>(str);
+}
+
+#if !defined(__wasi__)
+// minizip-ng を使う既存環境向け。WASI では src/core/zip_wasi.cpp 側の実装を使う。
+
 ArchiveXmlProvider::~ArchiveXmlProvider() {
   close_archive();
 }
@@ -417,6 +451,8 @@ auto ArchiveXmlProvider::write_entry(std::string_view path, std::span<const uint
   return {};
 }
 
+#endif // !defined(__wasi__)
+
 auto ArchiveXmlProvider::serialize_stack(OraDocument const& doc) -> std::string {
   auto xml = std::string{
     "<?xml version='1.0' encoding='UTF-8'?>\n<image version='0.0.5' w='" +
@@ -452,80 +488,84 @@ auto make_unexpected(Error::Code code, std::string_view target, std::string_view
  * @return 復元したドキュメント、失敗時はエラーを返します。
  */
 auto deserialize_stack(std::span<const uint8_t> xml_bytes) -> std::expected<OraDocument, Error> {
-  try {
-    std::string_view xml(reinterpret_cast<const char*>(xml_bytes.data()), xml_bytes.size());
-    OraDocument doc;
-    size_t pos = 0;
-    std::set<std::string> layer_names;
-    std::vector<std::size_t> path;
+  std::string_view xml(reinterpret_cast<const char*>(xml_bytes.data()), xml_bytes.size());
+  OraDocument doc;
+  size_t pos = 0;
+  std::set<std::string> layer_names;
+  std::vector<std::size_t> path;
 
-    auto get_attr = [](const std::map<std::string, std::string>& attrs, const std::string& key, const std::string& def) {
-      auto it = attrs.find(key);
-      return it != attrs.end() ? it->second : def;
-    };
-    auto get_target = [&doc](const std::vector<std::size_t>& current_path) -> std::vector<Node>* {
-      auto* current = &doc.root_nodes;
-      for (auto const idx : current_path) {
-        if (idx >= current->size()) {
-          return nullptr;
-        }
-        current = &(*current)[idx].children;
+  auto get_attr = [](const std::map<std::string, std::string>& attrs, const std::string& key, const std::string& def) {
+    auto it = attrs.find(key);
+    return it != attrs.end() ? it->second : def;
+  };
+  auto get_target = [&doc](const std::vector<std::size_t>& current_path) -> std::vector<Node>* {
+    auto* current = &doc.root_nodes;
+    for (auto const idx : current_path) {
+      if (idx >= current->size()) {
+        return nullptr;
       }
-      return current;
-    };
+      current = &(*current)[idx].children;
+    }
+    return current;
+  };
 
-    while (auto tag = parse_next_tag(xml, pos)) {
-      if (tag->name == "image" && tag->kind != xml_tag::End) {
-        auto const w_str = get_attr(tag->attrs, "w", "0");
-        auto const h_str = get_attr(tag->attrs, "h", "0");
-        if (w_str.find_first_not_of("0123456789") != std::string::npos) throw std::invalid_argument("invalid width");
-        doc.width = std::stoul(w_str);
-        doc.height = std::stoul(h_str);
-      } else if (tag->name == "stack") {
-        if (tag->kind == xml_tag::End) {
-          if (!path.empty()) {
-            path.pop_back();
-          }
-        } else {
-          auto const name = get_attr(tag->attrs, "name", "");
-          auto const x = std::stoi(get_attr(tag->attrs, "x", "0"));
-          auto const y = std::stoi(get_attr(tag->attrs, "y", "0"));
-          auto const vis = get_attr(tag->attrs, "visibility", "visible") == "visible";
-          auto const opacity = std::stof(get_attr(tag->attrs, "opacity", "1.0"));
-          auto const blend_str = get_attr(tag->attrs, "composite-op", "svg:src-over");
-          auto blend = from_string(blend_str);
-          if (!blend) return detail::make_unexpected(Error::Code::XmlParseFailed, blend_str, "invalid blend mode");
-
-          auto* target = get_target(path);
-          if (target == nullptr) return detail::make_unexpected(Error::Code::InvalidOraDocument, "stack.xml", "invalid stack nesting");
-
-          target->push_back(Node{Node::Type::Stack, name, x, y, vis, opacity, *blend, {}});
-          if (tag->kind == xml_tag::Start) {
-            path.push_back(target->size() - 1);
-          }
+  while (auto tag = parse_next_tag(xml, pos)) {
+    if (tag->name == "image" && tag->kind != xml_tag::End) {
+      auto const w = parse_uint(get_attr(tag->attrs, "w", "0"));
+      auto const h = parse_uint(get_attr(tag->attrs, "h", "0"));
+      if (!w || !h) {
+        return detail::make_unexpected(Error::Code::XmlParseFailed, "stack.xml", "invalid dimensions");
+      }
+      doc.width = static_cast<unsigned int>(*w);
+      doc.height = static_cast<unsigned int>(*h);
+    } else if (tag->name == "stack") {
+      if (tag->kind == xml_tag::End) {
+        if (!path.empty()) {
+          path.pop_back();
         }
-      } else if (tag->name == "layer" && tag->kind != xml_tag::End) {
+      } else {
         auto const name = get_attr(tag->attrs, "name", "");
-        if (not layer_names.insert(name).second) return detail::make_unexpected(Error::Code::InvalidOraDocument, name, "duplicate layer name");
-
-        auto const x = std::stoi(get_attr(tag->attrs, "x", "0"));
-        auto const y = std::stoi(get_attr(tag->attrs, "y", "0"));
+        auto const x = parse_int(get_attr(tag->attrs, "x", "0"));
+        auto const y = parse_int(get_attr(tag->attrs, "y", "0"));
         auto const vis = get_attr(tag->attrs, "visibility", "visible") == "visible";
-        auto const opacity = std::stof(get_attr(tag->attrs, "opacity", "1.0"));
+        auto const opacity = parse_float(get_attr(tag->attrs, "opacity", "1.0"));
+        if (!x || !y || !opacity) {
+          return detail::make_unexpected(Error::Code::XmlParseFailed, "stack.xml", "invalid numeric attribute");
+        }
         auto const blend_str = get_attr(tag->attrs, "composite-op", "svg:src-over");
         auto blend = from_string(blend_str);
         if (!blend) return detail::make_unexpected(Error::Code::XmlParseFailed, blend_str, "invalid blend mode");
 
         auto* target = get_target(path);
-        if (target == nullptr) return detail::make_unexpected(Error::Code::InvalidOraDocument, "stack.xml", "invalid layer nesting");
+        if (target == nullptr) return detail::make_unexpected(Error::Code::InvalidOraDocument, "stack.xml", "invalid stack nesting");
 
-        target->push_back(Node{Node::Type::Layer, name, x, y, vis, opacity, *blend, {}});
+        target->push_back(Node{Node::Type::Stack, name, *x, *y, vis, *opacity, *blend, {}});
+        if (tag->kind == xml_tag::Start) {
+          path.push_back(target->size() - 1);
+        }
       }
+    } else if (tag->name == "layer" && tag->kind != xml_tag::End) {
+      auto const name = get_attr(tag->attrs, "name", "");
+      if (not layer_names.insert(name).second) return detail::make_unexpected(Error::Code::InvalidOraDocument, name, "duplicate layer name");
+
+      auto const x = parse_int(get_attr(tag->attrs, "x", "0"));
+      auto const y = parse_int(get_attr(tag->attrs, "y", "0"));
+      auto const vis = get_attr(tag->attrs, "visibility", "visible") == "visible";
+      auto const opacity = parse_float(get_attr(tag->attrs, "opacity", "1.0"));
+      if (!x || !y || !opacity) {
+        return detail::make_unexpected(Error::Code::XmlParseFailed, "stack.xml", "invalid numeric attribute");
+      }
+      auto const blend_str = get_attr(tag->attrs, "composite-op", "svg:src-over");
+      auto blend = from_string(blend_str);
+      if (!blend) return detail::make_unexpected(Error::Code::XmlParseFailed, blend_str, "invalid blend mode");
+
+      auto* target = get_target(path);
+      if (target == nullptr) return detail::make_unexpected(Error::Code::InvalidOraDocument, "stack.xml", "invalid layer nesting");
+
+      target->push_back(Node{Node::Type::Layer, name, *x, *y, vis, *opacity, *blend, {}});
     }
-    return doc;
-  } catch (const std::exception& e) {
-    return detail::make_unexpected(Error::Code::XmlParseFailed, "stack.xml", e.what());
   }
+  return doc;
 }
 
 /**

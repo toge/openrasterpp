@@ -76,7 +76,7 @@
 
 ## 依存関係
 
-- core: `minizip-ng`
+- core: `minizip-ng`, `fast-float`（数値パース用、ヘッダオンリー）
 - backend (`png-lodepng`): `lodepng`
 - backend (`png-libspng`): `libspng`
 - backend (`png-libpng`): `libpng`
@@ -91,6 +91,40 @@ cmake -S . -B build \
   -DCMAKE_PREFIX_PATH="$PWD/vcpkg_installed/x64-linux"
 
 cmake --build build --parallel 4
+```
+
+## WASI (wasip1) ビルド
+
+WASI 検出時（`CMAKE_SYSTEM_NAME=WASI`）のみ別経路を使い、既存環境の動作は変えていません。
+例外が使えない、setjmp/longjmp が使えない、シグナルハンドラを定義できない、などの制限の回避です。
+
+wasip2がwasi-sdkでサポートされた場合には再検討します。
+
+
+- ZIP: minizip(-ng) ではなく zlib 直利用の内蔵実装（`src/core/zip_wasi.cpp`）
+- lodepng: 例外参照のない C API 版（`lodepng-c` + `src/backends/lodepng_c_wrap.c`）
+- `deserialize_stack` は全環境で例外なし化（`throw/stoi/stof` 廃止）
+- WASI では `-march=native` 無効、`-fno-exceptions`、libpng/libspng/fpng は既定 OFF
+
+```bash
+cmake -S . -B build-wasi \
+  -G "Unix Makefiles" \
+  --toolchain ~/vm/wasi-sdk/share/cmake/wasi-sdk-p1.cmake \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_TOOLCHAIN_FILE=~/vm/vcpkg/scripts/buildsystems/vcpkg.cmake \
+  -DVCPKG_MANIFEST_MODE=OFF \
+  -DVCPKG_TARGET_TRIPLET=wasm32-wasip1 \
+  -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=~/vm/wasi-sdk/share/cmake/wasi-sdk-p1.cmake \
+  -DCMAKE_PREFIX_PATH=~/vm/vcpkg/installed/wasm32-wasip1 \
+  -DBUILD_TEST=OFF
+
+cmake --build build-wasi --parallel 4
+```
+
+実行例（wasmedge）:
+
+```bash
+wasmedge --dir .:. your_app.wasm
 ```
 
 ## テスト

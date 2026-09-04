@@ -270,6 +270,27 @@ concept OraProvider = requires(T& p, std::string_view path, std::span<const uint
 namespace detail {
 
 /**
+ * @brief 10進の非負整数を例外なしで解析します（`fast_float` 利用）。
+ * @param str 解析対象文字列です。
+ * @return 妥当な場合は値、不正な場合は `std::nullopt` を返します。
+ */
+[[nodiscard]] auto parse_uint(std::string_view str) -> std::optional<unsigned long>;
+
+/**
+ * @brief 10進の符号付き整数を例外なしで解析します（`fast_float` 利用）。
+ * @param str 解析対象文字列です。
+ * @return 妥当な場合は値、不正な場合は `std::nullopt` を返します。
+ */
+[[nodiscard]] auto parse_int(std::string_view str) -> std::optional<int>;
+
+/**
+ * @brief 浮動小数点数を例外なしで解析します（`fast_float` 利用）。
+ * @param str 解析対象文字列です。
+ * @return 妥当な場合は値、不正な場合は `std::nullopt` を返します。
+ */
+[[nodiscard]] auto parse_float(std::string_view str) -> std::optional<float>;
+
+/**
  * @brief 指定情報から `std::unexpected<Error>` を組み立てます。
  * @param code エラー種別です。
  * @param target エラー対象を表す文字列です。

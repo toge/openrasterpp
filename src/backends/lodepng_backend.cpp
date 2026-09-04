@@ -4,6 +4,17 @@
 
 #include "lodepng.h"
 
+#if defined(__wasi__)
+// lodepng.h の C API 宣言は C++ リンケージだが実体は C のため、
+// C ソースのラッパー経由で呼ぶ（直接呼ぶと undefined symbol になる）。
+extern "C" {
+auto ora_lodepng_encode32(unsigned char** out, size_t* outsize, const unsigned char* image, unsigned w, unsigned h) -> unsigned;
+auto ora_lodepng_decode32(unsigned char** out, unsigned* w, unsigned* h, const unsigned char* in, size_t insize) -> unsigned;
+auto ora_lodepng_error_text(unsigned code) -> const char*;
+}
+#endif
+
+#include <cstdlib>
 #include <utility>
 
 namespace ora {
@@ -39,14 +50,40 @@ public:
 
   auto encode_png(std::span<const uint8_t> rgba, unsigned int width, unsigned int height)
       -> std::expected<std::vector<uint8_t>, Error> {
+#if defined(__wasi__)
+    // WASI では C++ ラッパー（例外参照あり）を避け、C API を使う。
+    auto* out = static_cast<unsigned char*>(nullptr);
+    auto out_size = static_cast<size_t>(0);
+    if (auto const err = ::ora_lodepng_encode32(&out, &out_size, rgba.data(), width, height); err != 0) {
+      return detail::make_unexpected(Error::Code::PngEncodeFailed, "buffer", ::ora_lodepng_error_text(err));
+    }
+    auto png = std::vector<uint8_t>(out, out + out_size);
+    std::free(out);
+    return png;
+#else
     auto png = std::vector<uint8_t>{};
     if (auto const err = ::lodepng::encode(png, rgba.data(), width, height); err != 0) {
       return detail::make_unexpected(Error::Code::PngEncodeFailed, "buffer", ::lodepng_error_text(err));
     }
     return png;
+#endif
   }
 
   auto decode_png(std::span<const uint8_t> data) -> std::expected<DecodedImage, Error> {
+#if defined(__wasi__)
+    auto image = DecodedImage{};
+    auto* out = static_cast<unsigned char*>(nullptr);
+    auto w = 0U;
+    auto h = 0U;
+    if (auto const err = ::ora_lodepng_decode32(&out, &w, &h, data.data(), data.size()); err != 0) {
+      return detail::make_unexpected(Error::Code::PngDecodeFailed, "buffer", ::ora_lodepng_error_text(err));
+    }
+    image.rgba.assign(out, out + static_cast<size_t>(w) * h * 4U);
+    std::free(out);
+    image.width = w;
+    image.height = h;
+    return image;
+#else
     auto image = DecodedImage{};
     if (auto const err = ::lodepng::decode(
           image.rgba,
@@ -58,6 +95,7 @@ public:
       return detail::make_unexpected(Error::Code::PngDecodeFailed, "buffer", ::lodepng_error_text(err));
     }
     return image;
+#endif
   }
 
 private:

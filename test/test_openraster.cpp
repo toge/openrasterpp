@@ -1,4 +1,5 @@
 #include "catch2/catch_test_macros.hpp"
+#include "catch2/catch_approx.hpp"
 #include "openraster.hpp"
 
 namespace {
@@ -371,4 +372,36 @@ TEST_CASE("render_preview_and_thumbnail preserves aspect ratio within 256px", "[
   REQUIRE(result.has_value());
   CHECK(doc.merged_image_png == make_provider_png(300, 150));
   CHECK(doc.thumbnail_png == make_provider_png(256, 128));
+}
+
+TEST_CASE("detail numeric parsing accepts extended float forms and rejects garbage", "[parse]") {
+  CHECK(ora::detail::parse_uint("100") == 100UL);
+  CHECK_FALSE(ora::detail::parse_uint("12x").has_value());
+  CHECK_FALSE(ora::detail::parse_uint("").has_value());
+  CHECK_FALSE(ora::detail::parse_uint("99999999999999999999999").has_value());
+
+  CHECK(ora::detail::parse_int("-3") == -3);
+  CHECK(ora::detail::parse_int("+3") == 3);
+  CHECK_FALSE(ora::detail::parse_int("3.5").has_value());
+
+  CHECK(ora::detail::parse_float("1.0") == 1.0f);
+  CHECK(ora::detail::parse_float("1e-1") == Catch::Approx(0.1f));
+  CHECK_FALSE(ora::detail::parse_float("abc").has_value());
+  CHECK_FALSE(ora::detail::parse_float("1.0trailing").has_value());
+}
+
+TEST_CASE("deserialize_stack rejects invalid numeric attributes", "[parse]") {
+  auto const xml = std::string{R"(<?xml version='1.0' encoding='UTF-8'?>
+<image version='0.0.5' w='100' h='100'>
+  <layer name='layer1' src='data/layer1.png' composite-op='svg:src-over' opacity='abc' visibility='visible' x='0' y='0'/>
+</image>
+)"};
+  auto const xml_bytes = std::span<const uint8_t>(
+    reinterpret_cast<const uint8_t*>(xml.data()),
+    xml.size()
+  );
+  auto const doc = ora::detail::deserialize_stack(xml_bytes);
+
+  REQUIRE_FALSE(doc.has_value());
+  CHECK(doc.error().code == ora::Error::Code::XmlParseFailed);
 }

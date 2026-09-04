@@ -1,6 +1,10 @@
 include(CMakeFindDependencyMacro)
 
-find_dependency(lodepng CONFIG REQUIRED)
+if(@OPENRASTERPP_WASI@)
+  find_dependency(lodepng-c CONFIG REQUIRED)
+else()
+  find_dependency(lodepng CONFIG REQUIRED)
+endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/openrasterppPngLodepngTargets.cmake")
 set(openrasterpp_png-lodepng_FOUND TRUE)
