@@ -253,6 +253,7 @@ jobs:
 
       - name: Install wasmtime
         run: |
+          touch ~/.bashrc
           curl -fsSL https://wasmtime.dev/install.sh -o /tmp/wasmtime-install.sh
           bash /tmp/wasmtime-install.sh --version v48.0.1
           $HOME/.wasmtime/bin/wasmtime --version
