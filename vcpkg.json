@@ -1,13 +1,32 @@
 {
   "name": "openrasterpp",
   "dependencies": [
-    "catch2",
+    {
+      "name": "catch2",
+      "platform": "!wasm32"
+    },
     "fast-float",
-    "minizip-ng",
-    "libpng",
+    {
+      "name": "minizip-ng",
+      "platform": "!wasm32"
+    },
+    {
+      "name": "libpng",
+      "platform": "!wasm32"
+    },
     "lodepng",
-    "libspng",
+    {
+      "name": "libspng",
+      "platform": "!wasm32"
+    },
     "stb",
-    "fpng"
+    {
+      "name": "fpng",
+      "platform": "!wasm32"
+    },
+    {
+      "name": "zlib",
+      "platform": "wasm32"
+    }
   ]
 }

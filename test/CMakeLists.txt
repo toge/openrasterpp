@@ -1,3 +1,24 @@
+# WASI (wasip1) 用スモークは常時ビルド可能（Catch2・hosted 依存なし）
+if(OPENRASTERPP_ENABLE_LODEPNG AND OPENRASTERPP_ENABLE_STB)
+  add_executable(smoke_wasi smoke_wasi.cpp)
+  target_link_libraries(smoke_wasi PRIVATE
+    openrasterpp-png-lodepng
+    openrasterpp-png-stb
+  )
+  target_compile_features(smoke_wasi PRIVATE cxx_std_23)
+  if(OPENRASTERPP_WASI)
+    # WASI/wasmedge では C++ 例外が使えないため、例外なし契約を検証する。
+    target_compile_options(smoke_wasi PRIVATE -fno-exceptions)
+  endif()
+  add_test(NAME smoke_wasi COMMAND smoke_wasi)
+endif()
+
+if(OPENRASTERPP_WASI)
+  # WASI ビルドでは Catch2/hosted なテストと install_smoke はスキップ。
+  # Catch2 は wasip1 でビルド不可、install_smoke はホスト実行前提のため。
+  return()
+endif()
+
 find_package(Catch2 REQUIRED CONFIG)
 
 add_executable(core_test test_openraster.cpp)
