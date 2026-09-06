@@ -16,7 +16,6 @@
 #include <iostream>
 #include <limits>
 #include <sstream>
-#include <stdexcept>
 #include <set>
 #include <tuple>
 #include <utility>
