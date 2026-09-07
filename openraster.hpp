@@ -57,7 +57,7 @@ enum class BlendMode {
  * @return `stack.xml` の `composite-op` に書き込める属性値を返します。
  */
 [[nodiscard]]
-auto to_string(BlendMode mode) -> std::string_view;
+auto to_string(BlendMode mode) noexcept -> std::string_view;
 
 /**
  * @brief OpenRasterの属性文字列をBlendModeに変換
@@ -65,7 +65,7 @@ auto to_string(BlendMode mode) -> std::string_view;
  * @return 対応するブレンドモード、未対応の場合は `std::nullopt` を返します。
  */
 [[nodiscard]]
-auto from_string(std::string_view sv) -> std::optional<BlendMode>;
+auto from_string(std::string_view sv) noexcept -> std::optional<BlendMode>;
 
 /**
  * @brief ライブラリ内の失敗理由を表現するエラー情報です。
@@ -194,7 +194,7 @@ struct OraDocument {
  * @return 初期化済みの `Node::Type::Layer` ノードを返します。
  */
 inline
-auto layer(std::string const& name, int x = 0, int y = 0, bool visible = true, float opacity = 1.0f, BlendMode mode = BlendMode::SrcOver) {
+auto layer(std::string const& name, int const x = 0, int const y = 0, bool const visible = true, float const opacity = 1.0f, BlendMode const mode = BlendMode::SrcOver) {
   return Node{Node::Type::Layer, name, x, y, visible, opacity, mode, {}};
 }
 
@@ -210,7 +210,7 @@ auto layer(std::string const& name, int x = 0, int y = 0, bool visible = true, f
  * @return 初期化済みの `Node::Type::Stack` ノードを返します。
  */
 inline
-auto stack(std::string const& name, std::vector<Node> const& children, int x = 0, int y = 0, bool visible = true, float opacity = 1.0f, BlendMode mode = BlendMode::SrcOver) {
+auto stack(std::string const& name, std::vector<Node> const& children, int const x = 0, int const y = 0, bool const visible = true, float const opacity = 1.0f, BlendMode const mode = BlendMode::SrcOver) {
   return Node{Node::Type::Stack, name, x, y, visible, opacity, mode, children};
 }
 
@@ -274,21 +274,21 @@ namespace detail {
  * @param str 解析対象文字列です。
  * @return 妥当な場合は値、不正な場合は `std::nullopt` を返します。
  */
-[[nodiscard]] auto parse_uint(std::string_view str) -> std::optional<unsigned long>;
+[[nodiscard]] auto parse_uint(std::string_view str) noexcept -> std::optional<unsigned long>;
 
 /**
  * @brief 10進の符号付き整数を例外なしで解析します（`fast_float` 利用）。
  * @param str 解析対象文字列です。
  * @return 妥当な場合は値、不正な場合は `std::nullopt` を返します。
  */
-[[nodiscard]] auto parse_int(std::string_view str) -> std::optional<int>;
+[[nodiscard]] auto parse_int(std::string_view str) noexcept -> std::optional<int>;
 
 /**
  * @brief 浮動小数点数を例外なしで解析します（`fast_float` 利用）。
  * @param str 解析対象文字列です。
  * @return 妥当な場合は値、不正な場合は `std::nullopt` を返します。
  */
-[[nodiscard]] auto parse_float(std::string_view str) -> std::optional<float>;
+[[nodiscard]] auto parse_float(std::string_view str) noexcept -> std::optional<float>;
 
 /**
  * @brief 指定情報から `std::unexpected<Error>` を組み立てます。

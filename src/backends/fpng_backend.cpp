@@ -19,7 +19,7 @@ public:
     });
   }
 
-  auto encode_png(std::span<const uint8_t> rgba, unsigned int width, unsigned int height)
+  auto encode_png(std::span<const uint8_t> const rgba, unsigned int const width, unsigned int const height)
       -> std::expected<std::vector<uint8_t>, Error> {
     std::vector<uint8_t> png;
     // fpng::fpng_encode_image_to_memory supports 24/32bpp
@@ -29,7 +29,7 @@ public:
     return png;
   }
 
-  auto decode_png(std::span<const uint8_t> data) -> std::expected<DecodedImage, Error> {
+  auto decode_png(std::span<const uint8_t> const data) -> std::expected<DecodedImage, Error> {
     uint32_t width = 0;
     uint32_t height = 0;
     uint32_t channels = 0;
@@ -60,12 +60,12 @@ auto encode_png(ImageBuffer const& image) -> std::expected<std::vector<uint8_t>,
   return encode_png_internal<FpngOraProvider>(image);
 }
 
-auto read(std::string_view filename) -> std::expected<OraDocument, Error> {
+auto read(std::string_view const filename) -> std::expected<OraDocument, Error> {
   FpngOraProvider provider;
   return ora::read(provider, filename);
 }
 
-auto write(std::string_view filename, OraDocument const& doc) -> std::expected<void, Error> {
+auto write(std::string_view const filename, OraDocument const& doc) -> std::expected<void, Error> {
   FpngOraProvider provider;
   return ora::write(provider, filename, doc);
 }

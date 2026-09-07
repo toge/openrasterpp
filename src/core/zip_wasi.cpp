@@ -25,27 +25,27 @@ namespace ora::detail {
 
 namespace {
 
-auto put_le16(std::vector<uint8_t>& out, uint16_t value) -> void {
+auto put_le16(std::vector<uint8_t>& out, uint16_t const value) -> void {
   out.push_back(static_cast<uint8_t>(value & 0xFFU));
   out.push_back(static_cast<uint8_t>((value >> 8) & 0xFFU));
 }
 
-auto put_le32(std::vector<uint8_t>& out, uint32_t value) -> void {
+auto put_le32(std::vector<uint8_t>& out, uint32_t const value) -> void {
   for (int i = 0; i < 4; ++i) {
     out.push_back(static_cast<uint8_t>((value >> (8 * i)) & 0xFFU));
   }
 }
 
-auto get_le16(const uint8_t* p) -> uint16_t {
+auto get_le16(const uint8_t* const p) noexcept -> uint16_t {
   return static_cast<uint16_t>(p[0]) | (static_cast<uint16_t>(p[1]) << 8);
 }
 
-auto get_le32(const uint8_t* p) -> uint32_t {
+auto get_le32(const uint8_t* const p) noexcept -> uint32_t {
   return static_cast<uint32_t>(p[0]) | (static_cast<uint32_t>(p[1]) << 8) |
          (static_cast<uint32_t>(p[2]) << 16) | (static_cast<uint32_t>(p[3]) << 24);
 }
 
-auto deflate_raw(std::span<const uint8_t> in) -> std::vector<uint8_t> {
+auto deflate_raw(std::span<const uint8_t> const in) -> std::vector<uint8_t> {
   auto out = std::vector<uint8_t>(deflateBound(nullptr, static_cast<uLong>(in.size())));
   auto stream = z_stream{};
   stream.next_in = const_cast<Bytef*>(in.data());
@@ -64,7 +64,7 @@ auto deflate_raw(std::span<const uint8_t> in) -> std::vector<uint8_t> {
   return out;
 }
 
-auto inflate_raw(std::span<const uint8_t> in, size_t expected) -> std::vector<uint8_t> {
+auto inflate_raw(std::span<const uint8_t> const in, size_t const expected) -> std::vector<uint8_t> {
   auto out = std::vector<uint8_t>(expected != 0 ? expected : in.size() * 3 + 64);
   auto stream = z_stream{};
   stream.next_in = const_cast<Bytef*>(in.data());
@@ -91,7 +91,7 @@ struct CentralRecord {
   uint16_t method;
 };
 
-auto build_zip(const std::map<std::string, std::vector<uint8_t>, std::less<>>& entries, bool compress) -> std::vector<uint8_t> {
+auto build_zip(const std::map<std::string, std::vector<uint8_t>, std::less<>>& entries, bool const compress) -> std::vector<uint8_t> {
   auto out = std::vector<uint8_t>{};
   auto records = std::vector<CentralRecord>{};
   auto names = std::vector<std::string>{};
@@ -152,7 +152,7 @@ auto build_zip(const std::map<std::string, std::vector<uint8_t>, std::less<>>& e
   return out;
 }
 
-auto find_entry(std::span<const uint8_t> zip, std::string_view name, std::vector<uint8_t>& out) -> bool {
+auto find_entry(std::span<const uint8_t> const zip, std::string_view const name, std::vector<uint8_t>& out) -> bool {
   if (zip.size() < 22) {
     return false;
   }
@@ -205,7 +205,7 @@ auto find_entry(std::span<const uint8_t> zip, std::string_view name, std::vector
 }
 
 auto read_whole_file(const std::string& path, std::vector<uint8_t>& out) -> bool {
-  auto* file = std::fopen(path.c_str(), "rb");
+  auto* const file = std::fopen(path.c_str(), "rb");
   if (file == nullptr) {
     return false;
   }
@@ -218,8 +218,8 @@ auto read_whole_file(const std::string& path, std::vector<uint8_t>& out) -> bool
   return static_cast<long>(read) == size;
 }
 
-auto write_whole_file(const std::string& path, std::span<const uint8_t> data) -> bool {
-  auto* file = std::fopen(path.c_str(), "wb");
+auto write_whole_file(const std::string& path, std::span<const uint8_t> const data) -> bool {
+  auto* const file = std::fopen(path.c_str(), "wb");
   if (file == nullptr) {
     return false;
   }
@@ -234,7 +234,7 @@ ArchiveXmlProvider::~ArchiveXmlProvider() {
   close_archive();
 }
 
-auto ArchiveXmlProvider::open_archive(std::string_view path, ArchiveMode mode) -> std::expected<void, Error> {
+auto ArchiveXmlProvider::open_archive(std::string_view const path, ArchiveMode const mode) -> std::expected<void, Error> {
   archive_path_ = std::string{path};
   archive_mode_ = mode;
   if (mode == ArchiveMode::Read) {
@@ -249,7 +249,7 @@ auto ArchiveXmlProvider::open_archive(std::string_view path, ArchiveMode mode) -
 
 auto ArchiveXmlProvider::close_archive() -> void {
   if (archive_mode_ == ArchiveMode::Write && !archive_path_.empty() && !pending_entries_.empty()) {
-    auto zip = build_zip(pending_entries_, true);
+    auto const zip = build_zip(pending_entries_, true);
     write_whole_file(archive_path_, zip);
     pending_entries_.clear();
   }
@@ -259,7 +259,7 @@ auto ArchiveXmlProvider::close_archive() -> void {
   archive_path_.clear();
 }
 
-auto ArchiveXmlProvider::read_entry(std::string_view path) -> std::expected<std::vector<uint8_t>, Error> {
+auto ArchiveXmlProvider::read_entry(std::string_view const path) -> std::expected<std::vector<uint8_t>, Error> {
   auto out = std::vector<uint8_t>{};
   if (!find_entry(archive_bytes_, path, out)) {
     return make_unexpected(Error::Code::InvalidOraDocument, path, "entry not found");
@@ -267,7 +267,7 @@ auto ArchiveXmlProvider::read_entry(std::string_view path) -> std::expected<std:
   return out;
 }
 
-auto ArchiveXmlProvider::write_entry(std::string_view path, std::span<const uint8_t> data, CompressionLevel /*level*/)
+auto ArchiveXmlProvider::write_entry(std::string_view const path, std::span<const uint8_t> const data, CompressionLevel const /*level*/)
     -> std::expected<void, Error> {
   pending_entries_[std::string{path}] = std::vector<uint8_t>(data.begin(), data.end());
   return {};

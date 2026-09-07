@@ -13,13 +13,13 @@ namespace ora {
 namespace {
 
 [[nodiscard]]
-auto make_libspng_error(Error::Code code, std::string_view message_detail) -> std::unexpected<Error> {
+auto make_libspng_error(Error::Code const code, std::string_view const message_detail) noexcept -> std::unexpected<Error> {
   return detail::make_unexpected(code, "libspng buffer", message_detail);
 }
 
 class LibspngOraProvider {
 public:
-  auto open_archive(std::string_view path, ArchiveMode mode) -> std::expected<void, Error> {
+  auto open_archive(std::string_view const path, ArchiveMode const mode) -> std::expected<void, Error> {
     return archive_.open_archive(path, mode);
   }
 
@@ -27,11 +27,11 @@ public:
     archive_.close_archive();
   }
 
-  auto read_entry(std::string_view path) -> std::expected<std::vector<uint8_t>, Error> {
+  auto read_entry(std::string_view const path) -> std::expected<std::vector<uint8_t>, Error> {
     return archive_.read_entry(path);
   }
 
-  auto write_entry(std::string_view path, std::span<const uint8_t> data, CompressionLevel level)
+  auto write_entry(std::string_view const path, std::span<const uint8_t> const data, CompressionLevel const level)
       -> std::expected<void, Error> {
     return archive_.write_entry(path, data, level);
   }
@@ -40,11 +40,11 @@ public:
     return archive_.serialize_stack(doc);
   }
 
-  auto deserialize_stack(std::span<const uint8_t> xml_bytes) -> std::expected<OraDocument, Error> {
+  auto deserialize_stack(std::span<const uint8_t> const xml_bytes) -> std::expected<OraDocument, Error> {
     return archive_.deserialize_stack(xml_bytes);
   }
 
-  auto encode_png(std::span<const uint8_t> rgba, unsigned int width, unsigned int height)
+  auto encode_png(std::span<const uint8_t> const rgba, unsigned int const width, unsigned int const height)
       -> std::expected<std::vector<uint8_t>, Error> {
     auto ctx_ = std::unique_ptr<spng_ctx, decltype(&::spng_ctx_free)>{
       ::spng_ctx_new(SPNG_CTX_ENCODER),
@@ -95,7 +95,7 @@ public:
     return std::vector<uint8_t>(png_.get(), png_.get() + png_size);
   }
 
-  auto decode_png(std::span<const uint8_t> data) -> std::expected<DecodedImage, Error> {
+  auto decode_png(std::span<const uint8_t> const data) -> std::expected<DecodedImage, Error> {
     auto ctx_ = std::unique_ptr<spng_ctx, decltype(&::spng_ctx_free)>{
       ::spng_ctx_new(0),
       ::spng_ctx_free
@@ -153,12 +153,12 @@ template auto util::render_preview_and_thumbnail<LibspngOraProvider>(LibspngOraP
 
 namespace libspng {
 
-auto read(std::string_view filename) -> std::expected<OraDocument, Error> {
+auto read(std::string_view const filename) -> std::expected<OraDocument, Error> {
   auto provider = LibspngOraProvider{};
   return ora::read(provider, filename);
 }
 
-auto write(std::string_view filename, OraDocument const& doc) -> std::expected<void, Error> {
+auto write(std::string_view const filename, OraDocument const& doc) -> std::expected<void, Error> {
   auto provider = LibspngOraProvider{};
   return ora::write(provider, filename, doc);
 }

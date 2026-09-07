@@ -39,12 +39,12 @@ private:
 };
 
 [[nodiscard]]
-auto make_libpng_error(Error::Code code, std::string_view message_detail) -> std::unexpected<Error> {
+auto make_libpng_error(Error::Code const code, std::string_view const message_detail) noexcept -> std::unexpected<Error> {
   return detail::make_unexpected(code, "libpng buffer", message_detail);
 }
 
 [[nodiscard]]
-auto make_libpng_error(Error::Code code, png_image const& image, std::string_view fallback_detail)
+auto make_libpng_error(Error::Code const code, png_image const& image, std::string_view const fallback_detail) noexcept
     -> std::unexpected<Error> {
   if (image.message[0] != '\0') {
     return make_libpng_error(code, image.message);
@@ -54,7 +54,7 @@ auto make_libpng_error(Error::Code code, png_image const& image, std::string_vie
 
 class LibpngOraProvider {
 public:
-  auto open_archive(std::string_view path, ArchiveMode mode) -> std::expected<void, Error> {
+  auto open_archive(std::string_view const path, ArchiveMode const mode) -> std::expected<void, Error> {
     return archive_.open_archive(path, mode);
   }
 
@@ -62,11 +62,11 @@ public:
     archive_.close_archive();
   }
 
-  auto read_entry(std::string_view path) -> std::expected<std::vector<uint8_t>, Error> {
+  auto read_entry(std::string_view const path) -> std::expected<std::vector<uint8_t>, Error> {
     return archive_.read_entry(path);
   }
 
-  auto write_entry(std::string_view path, std::span<const uint8_t> data, CompressionLevel level)
+  auto write_entry(std::string_view const path, std::span<const uint8_t> const data, CompressionLevel const level)
       -> std::expected<void, Error> {
     return archive_.write_entry(path, data, level);
   }
@@ -75,11 +75,11 @@ public:
     return archive_.serialize_stack(doc);
   }
 
-  auto deserialize_stack(std::span<const uint8_t> xml_bytes) -> std::expected<OraDocument, Error> {
+  auto deserialize_stack(std::span<const uint8_t> const xml_bytes) -> std::expected<OraDocument, Error> {
     return archive_.deserialize_stack(xml_bytes);
   }
 
-  auto encode_png(std::span<const uint8_t> rgba, unsigned int width, unsigned int height)
+  auto encode_png(std::span<const uint8_t> const rgba, unsigned int const width, unsigned int const height)
       -> std::expected<std::vector<uint8_t>, Error> {
     auto image = ScopedPngImage{};
     image.get()->width = width;
@@ -116,7 +116,7 @@ public:
     return png;
   }
 
-  auto decode_png(std::span<const uint8_t> data) -> std::expected<DecodedImage, Error> {
+  auto decode_png(std::span<const uint8_t> const data) -> std::expected<DecodedImage, Error> {
     auto image = ScopedPngImage{};
     if (::png_image_begin_read_from_memory(image.get(), data.data(), data.size()) == 0) {
       return make_libpng_error(Error::Code::PngDecodeFailed, *image.get(), "failed to begin libpng decode");
@@ -152,12 +152,12 @@ template auto util::render_preview_and_thumbnail<LibpngOraProvider>(LibpngOraPro
 
 namespace libpng {
 
-auto read(std::string_view filename) -> std::expected<OraDocument, Error> {
+auto read(std::string_view const filename) -> std::expected<OraDocument, Error> {
   auto provider = LibpngOraProvider{};
   return ora::read(provider, filename);
 }
 
-auto write(std::string_view filename, OraDocument const& doc) -> std::expected<void, Error> {
+auto write(std::string_view const filename, OraDocument const& doc) -> std::expected<void, Error> {
   auto provider = LibpngOraProvider{};
   return ora::write(provider, filename, doc);
 }

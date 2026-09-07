@@ -19,14 +19,14 @@ namespace ora {
 namespace {
 
 [[nodiscard]]
-auto make_stb_error(Error::Code code, std::string_view detail) -> std::unexpected<Error> {
+auto make_stb_error(Error::Code const code, std::string_view const detail) noexcept -> std::unexpected<Error> {
   auto const message = detail.empty() ? "unknown stb failure" : detail;
   return detail::make_unexpected(code, "stb buffer", message);
 }
 
 class StbOraProvider {
 public:
-  auto open_archive(std::string_view path, ArchiveMode mode) -> std::expected<void, Error> {
+  auto open_archive(std::string_view const path, ArchiveMode const mode) -> std::expected<void, Error> {
     return archive_.open_archive(path, mode);
   }
 
@@ -34,11 +34,11 @@ public:
     archive_.close_archive();
   }
 
-  auto read_entry(std::string_view path) -> std::expected<std::vector<uint8_t>, Error> {
+  auto read_entry(std::string_view const path) -> std::expected<std::vector<uint8_t>, Error> {
     return archive_.read_entry(path);
   }
 
-  auto write_entry(std::string_view path, std::span<const uint8_t> data, CompressionLevel level)
+  auto write_entry(std::string_view const path, std::span<const uint8_t> const data, CompressionLevel const level)
       -> std::expected<void, Error> {
     return archive_.write_entry(path, data, level);
   }
@@ -47,11 +47,11 @@ public:
     return archive_.serialize_stack(doc);
   }
 
-  auto deserialize_stack(std::span<const uint8_t> xml_bytes) -> std::expected<OraDocument, Error> {
+  auto deserialize_stack(std::span<const uint8_t> const xml_bytes) -> std::expected<OraDocument, Error> {
     return archive_.deserialize_stack(xml_bytes);
   }
 
-  auto encode_png(std::span<const uint8_t> rgba, unsigned int width, unsigned int height)
+  auto encode_png(std::span<const uint8_t> const rgba, unsigned int const width, unsigned int const height)
       -> std::expected<std::vector<uint8_t>, Error> {
     auto constexpr max_int = static_cast<unsigned int>(std::numeric_limits<int>::max());
     if (width > max_int || height > max_int || width > max_int / 4U) {
@@ -80,7 +80,7 @@ public:
     return png;
   }
 
-  auto decode_png(std::span<const uint8_t> data) -> std::expected<DecodedImage, Error> {
+  auto decode_png(std::span<const uint8_t> const data) -> std::expected<DecodedImage, Error> {
     auto constexpr max_int = static_cast<std::size_t>(std::numeric_limits<int>::max());
     if (data.size() > max_int) {
       return make_stb_error(Error::Code::PngDecodeFailed, "image payload exceeds stb limits");
@@ -129,12 +129,12 @@ template auto util::render_preview_and_thumbnail<StbOraProvider>(StbOraProvider&
 
 namespace stb {
 
-auto read(std::string_view filename) -> std::expected<OraDocument, Error> {
+auto read(std::string_view const filename) -> std::expected<OraDocument, Error> {
   auto provider = StbOraProvider{};
   return ora::read(provider, filename);
 }
 
-auto write(std::string_view filename, OraDocument const& doc) -> std::expected<void, Error> {
+auto write(std::string_view const filename, OraDocument const& doc) -> std::expected<void, Error> {
   auto provider = StbOraProvider{};
   return ora::write(provider, filename, doc);
 }

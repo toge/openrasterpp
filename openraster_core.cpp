@@ -52,49 +52,50 @@ struct composite_factors {
   float backdrop; ///< 背景側へ掛ける係数です。
 };
 
-constexpr auto clamp_unit(float value) -> float { return std::clamp(value, 0.0f, 1.0f); }
-constexpr auto absolute_difference(float lhs, float rhs) -> float { return lhs < rhs ? rhs - lhs : lhs - rhs; }
-constexpr auto approximately_equal(float lhs, float rhs, float epsilon = 1.0e-5f) -> bool { return absolute_difference(lhs, rhs) <= epsilon; }
-constexpr auto clamp_rgb(linear_rgb color) -> linear_rgb { return {clamp_unit(color.red), clamp_unit(color.green), clamp_unit(color.blue)}; }
-constexpr auto add(linear_rgb lhs, linear_rgb rhs) -> linear_rgb { return {lhs.red + rhs.red, lhs.green + rhs.green, lhs.blue + rhs.blue}; }
-constexpr auto multiply(linear_rgb color, float scalar) -> linear_rgb { return {color.red * scalar, color.green * scalar, color.blue * scalar}; }
-constexpr auto min_component(linear_rgb color) -> float { return std::min({color.red, color.green, color.blue}); }
-constexpr auto max_component(linear_rgb color) -> float { return std::max({color.red, color.green, color.blue}); }
+constexpr auto clamp_unit(float const value) noexcept -> float { return std::clamp(value, 0.0f, 1.0f); }
+constexpr auto absolute_difference(float const lhs, float const rhs) noexcept -> float { return lhs < rhs ? rhs - lhs : lhs - rhs; }
+constexpr auto approximately_equal(float const lhs, float const rhs, float const epsilon = 1.0e-5f) noexcept -> bool { return absolute_difference(lhs, rhs) <= epsilon; }
+constexpr auto clamp_rgb(linear_rgb const color) noexcept -> linear_rgb { return {clamp_unit(color.red), clamp_unit(color.green), clamp_unit(color.blue)}; }
+constexpr auto add(linear_rgb const lhs, linear_rgb const rhs) noexcept -> linear_rgb { return {lhs.red + rhs.red, lhs.green + rhs.green, lhs.blue + rhs.blue}; }
+constexpr auto multiply(linear_rgb const color, float const scalar) noexcept -> linear_rgb { return {color.red * scalar, color.green * scalar, color.blue * scalar}; }
+constexpr auto min_component(linear_rgb const color) noexcept -> float { return std::min({color.red, color.green, color.blue}); }
+constexpr auto max_component(linear_rgb const color) noexcept -> float { return std::max({color.red, color.green, color.blue}); }
 
-constexpr auto constexpr_sqrt(float value) -> float {
+constexpr auto constexpr_sqrt(float const value) noexcept -> float {
   if (value <= 0.0f) return 0.0f;
   auto current = value > 1.0f ? value : 1.0f;
   for (int i = 0; i < 8; ++i) current = 0.5f * (current + value / current);
   return current;
 }
 
-auto srgb_to_linear_component(float value) -> float {
+auto srgb_to_linear_component(float const value) noexcept -> float {
   return (value <= 0.04045f) ? (value / 12.92f) : std::pow((value + 0.055f) / 1.055f, 2.4f);
 }
 
-auto linear_to_srgb_component(float value) -> float {
+auto linear_to_srgb_component(float const value) noexcept -> float {
   auto const clamped = clamp_unit(value);
   return (clamped <= 0.0031308f) ? (12.92f * clamped) : (1.055f * std::pow(clamped, 1.0f / 2.4f) - 0.055f);
 }
 
-constexpr auto byte_to_unit(uint8_t value) -> float { return static_cast<float>(value) / 255.0f; }
-constexpr auto unit_to_byte(float value) -> uint8_t { return static_cast<uint8_t>(std::clamp(value, 0.0f, 1.0f) * 255.0f + 0.5f); }
-constexpr auto luminosity(linear_rgb color) -> float { return 0.3f * color.red + 0.59f * color.green + 0.11f * color.blue; }
-constexpr auto saturation(linear_rgb color) -> float { return max_component(color) - min_component(color); }
+constexpr auto byte_to_unit(uint8_t const value) noexcept -> float { return static_cast<float>(value) / 255.0f; }
+constexpr auto unit_to_byte(float const value) noexcept -> uint8_t { return static_cast<uint8_t>(std::clamp(value, 0.0f, 1.0f) * 255.0f + 0.5f); }
+constexpr auto luminosity(linear_rgb const color) noexcept -> float { return 0.3f * color.red + 0.59f * color.green + 0.11f * color.blue; }
+constexpr auto saturation(linear_rgb const color) noexcept -> float { return max_component(color) - min_component(color); }
 
-constexpr auto clip_color(linear_rgb color) -> linear_rgb {
+constexpr auto clip_color(linear_rgb const color) -> linear_rgb {
   auto const L = luminosity(color); auto const n = min_component(color); auto const x = max_component(color);
-  if (n < 0.0f) color = { L + ((color.red - L) * L) / (L - n), L + ((color.green - L) * L) / (L - n), L + ((color.blue - L) * L) / (L - n) };
-  if (x > 1.0f) color = { L + ((color.red - L) * (1.0f - L)) / (x - L), L + ((color.green - L) * (1.0f - L)) / (x - L), L + ((color.blue - L) * (1.0f - L)) / (x - L) };
-  return color;
+  auto result = color;
+  if (n < 0.0f) result = { L + ((color.red - L) * L) / (L - n), L + ((color.green - L) * L) / (L - n), L + ((color.blue - L) * L) / (L - n) };
+  if (x > 1.0f) result = { L + ((result.red - L) * (1.0f - L)) / (x - L), L + ((result.green - L) * (1.0f - L)) / (x - L), L + ((result.blue - L) * (1.0f - L)) / (x - L) };
+  return result;
 }
 
-constexpr auto set_luminosity(linear_rgb color, float target_luminosity) -> linear_rgb {
+constexpr auto set_luminosity(linear_rgb const color, float const target_luminosity) -> linear_rgb {
   auto const delta = target_luminosity - luminosity(color);
   return clip_color({color.red + delta, color.green + delta, color.blue + delta});
 }
 
-constexpr auto set_saturation(linear_rgb color, float target_saturation) -> linear_rgb {
+constexpr auto set_saturation(linear_rgb const color, float const target_saturation) -> linear_rgb {
   auto components = std::array<float, 3>{color.red, color.green, color.blue};
   auto min_idx = 0; if (components[1] < components[min_idx]) min_idx = 1; if (components[2] < components[min_idx]) min_idx = 2;
   auto max_idx = 0; if (components[1] > components[max_idx]) max_idx = 1; if (components[2] > components[max_idx]) max_idx = 2;
@@ -107,43 +108,43 @@ constexpr auto set_saturation(linear_rgb color, float target_saturation) -> line
   return {components[0], components[1], components[2]};
 }
 
-constexpr auto blend_src_over(linear_rgb, linear_rgb s) -> linear_rgb { return s; }
-constexpr auto blend_multiply(linear_rgb b, linear_rgb s) -> linear_rgb { return {b.red * s.red, b.green * s.green, b.blue * s.blue}; }
-constexpr auto blend_screen(linear_rgb b, linear_rgb s) -> linear_rgb { return {b.red + s.red - b.red * s.red, b.green + s.green - b.green * s.green, b.blue + s.blue - b.blue * s.blue}; }
-constexpr auto blend_overlay(linear_rgb b, linear_rgb s) -> linear_rgb {
-  auto const f = [](float bv, float sv) { return bv <= 0.5f ? 2.0f * bv * sv : 1.0f - 2.0f * (1.0f - bv) * (1.0f - sv); };
+constexpr auto blend_src_over(linear_rgb const /*b*/, linear_rgb const s) noexcept -> linear_rgb { return s; }
+constexpr auto blend_multiply(linear_rgb const b, linear_rgb const s) noexcept -> linear_rgb { return {b.red * s.red, b.green * s.green, b.blue * s.blue}; }
+constexpr auto blend_screen(linear_rgb const b, linear_rgb const s) noexcept -> linear_rgb { return {b.red + s.red - b.red * s.red, b.green + s.green - b.green * s.green, b.blue + s.blue - b.blue * s.blue}; }
+constexpr auto blend_overlay(linear_rgb const b, linear_rgb const s) noexcept -> linear_rgb {
+  auto const f = [](float const bv, float const sv) noexcept { return bv <= 0.5f ? 2.0f * bv * sv : 1.0f - 2.0f * (1.0f - bv) * (1.0f - sv); };
   return {f(b.red, s.red), f(b.green, s.green), f(b.blue, s.blue)};
 }
-constexpr auto blend_darken(linear_rgb b, linear_rgb s) -> linear_rgb { return {std::min(b.red, s.red), std::min(b.green, s.green), std::min(b.blue, s.blue)}; }
-constexpr auto blend_lighten(linear_rgb b, linear_rgb s) -> linear_rgb { return {std::max(b.red, s.red), std::max(b.green, s.green), std::max(b.blue, s.blue)}; }
-constexpr auto blend_color_dodge(linear_rgb b, linear_rgb s) -> linear_rgb {
-  auto const f = [](float bv, float sv) { return approximately_equal(bv, 0.0f) ? 0.0f : (approximately_equal(sv, 1.0f) ? 1.0f : std::min(1.0f, bv / (1.0f - sv))); };
+constexpr auto blend_darken(linear_rgb const b, linear_rgb const s) noexcept -> linear_rgb { return {std::min(b.red, s.red), std::min(b.green, s.green), std::min(b.blue, s.blue)}; }
+constexpr auto blend_lighten(linear_rgb const b, linear_rgb const s) noexcept -> linear_rgb { return {std::max(b.red, s.red), std::max(b.green, s.green), std::max(b.blue, s.blue)}; }
+constexpr auto blend_color_dodge(linear_rgb const b, linear_rgb const s) noexcept -> linear_rgb {
+  auto const f = [](float const bv, float const sv) noexcept { return approximately_equal(bv, 0.0f) ? 0.0f : (approximately_equal(sv, 1.0f) ? 1.0f : std::min(1.0f, bv / (1.0f - sv))); };
   return {f(b.red, s.red), f(b.green, s.green), f(b.blue, s.blue)};
 }
-constexpr auto blend_color_burn(linear_rgb b, linear_rgb s) -> linear_rgb {
-  auto const f = [](float bv, float sv) { return approximately_equal(bv, 1.0f) ? 1.0f : (approximately_equal(sv, 0.0f) ? 0.0f : 1.0f - std::min(1.0f, (1.0f - bv) / sv)); };
+constexpr auto blend_color_burn(linear_rgb const b, linear_rgb const s) noexcept -> linear_rgb {
+  auto const f = [](float const bv, float const sv) noexcept { return approximately_equal(bv, 1.0f) ? 1.0f : (approximately_equal(sv, 0.0f) ? 0.0f : 1.0f - std::min(1.0f, (1.0f - bv) / sv)); };
   return {f(b.red, s.red), f(b.green, s.green), f(b.blue, s.blue)};
 }
-constexpr auto blend_hard_light(linear_rgb b, linear_rgb s) -> linear_rgb {
-  auto const f = [](float bv, float sv) { return sv <= 0.5f ? 2.0f * bv * sv : 1.0f - 2.0f * (1.0f - bv) * (1.0f - sv); };
+constexpr auto blend_hard_light(linear_rgb const b, linear_rgb const s) noexcept -> linear_rgb {
+  auto const f = [](float const bv, float const sv) noexcept { return sv <= 0.5f ? 2.0f * bv * sv : 1.0f - 2.0f * (1.0f - bv) * (1.0f - sv); };
   return {f(b.red, s.red), f(b.green, s.green), f(b.blue, s.blue)};
 }
-constexpr auto blend_soft_light(linear_rgb b, linear_rgb s) -> linear_rgb {
-  auto const f = [](float bv, float sv) {
+constexpr auto blend_soft_light(linear_rgb const b, linear_rgb const s) noexcept -> linear_rgb {
+  auto const f = [](float const bv, float const sv) noexcept {
     if (sv <= 0.5f) return bv - (1.0f - 2.0f * sv) * bv * (1.0f - bv);
     auto const d = bv <= 0.25f ? ((16.0f * bv - 12.0f) * bv + 4.0f) * bv : constexpr_sqrt(bv);
     return bv + (2.0f * sv - 1.0f) * (d - bv);
   };
   return {f(b.red, s.red), f(b.green, s.green), f(b.blue, s.blue)};
 }
-constexpr auto blend_difference(linear_rgb b, linear_rgb s) -> linear_rgb { return {absolute_difference(b.red, s.red), absolute_difference(b.green, s.green), absolute_difference(b.blue, s.blue)}; }
-constexpr auto blend_exclusion(linear_rgb b, linear_rgb s) -> linear_rgb { return {b.red + s.red - 2.0f * b.red * s.red, b.green + s.green - 2.0f * b.green * s.green, b.blue + s.blue - 2.0f * b.blue * s.blue}; }
-constexpr auto blend_hue(linear_rgb b, linear_rgb s) -> linear_rgb { return set_luminosity(set_saturation(s, saturation(b)), luminosity(b)); }
-constexpr auto blend_saturation(linear_rgb b, linear_rgb s) -> linear_rgb { return set_luminosity(set_saturation(b, saturation(s)), luminosity(b)); }
-constexpr auto blend_color(linear_rgb b, linear_rgb s) -> linear_rgb { return set_luminosity(s, luminosity(b)); }
-constexpr auto blend_luminosity(linear_rgb b, linear_rgb s) -> linear_rgb { return set_luminosity(b, luminosity(s)); }
+constexpr auto blend_difference(linear_rgb const b, linear_rgb const s) noexcept -> linear_rgb { return {absolute_difference(b.red, s.red), absolute_difference(b.green, s.green), absolute_difference(b.blue, s.blue)}; }
+constexpr auto blend_exclusion(linear_rgb const b, linear_rgb const s) noexcept -> linear_rgb { return {b.red + s.red - 2.0f * b.red * s.red, b.green + s.green - 2.0f * b.green * s.green, b.blue + s.blue - 2.0f * b.blue * s.blue}; }
+constexpr auto blend_hue(linear_rgb const b, linear_rgb const s) noexcept -> linear_rgb { return set_luminosity(set_saturation(s, saturation(b)), luminosity(b)); }
+constexpr auto blend_saturation(linear_rgb const b, linear_rgb const s) noexcept -> linear_rgb { return set_luminosity(set_saturation(b, saturation(s)), luminosity(b)); }
+constexpr auto blend_color(linear_rgb const b, linear_rgb const s) noexcept -> linear_rgb { return set_luminosity(s, luminosity(b)); }
+constexpr auto blend_luminosity(linear_rgb const b, linear_rgb const s) noexcept -> linear_rgb { return set_luminosity(b, luminosity(s)); }
 
-constexpr auto apply_blend_function(BlendMode mode, linear_rgb b, linear_rgb s) -> linear_rgb {
+constexpr auto apply_blend_function(BlendMode const mode, linear_rgb const b, linear_rgb const s) noexcept -> linear_rgb {
   switch (mode) {
     case BlendMode::SrcOver: return blend_src_over(b, s);
     case BlendMode::Multiply: return blend_multiply(b, s);
@@ -165,7 +166,7 @@ constexpr auto apply_blend_function(BlendMode mode, linear_rgb b, linear_rgb s) 
   }
 }
 
-constexpr auto composite_mode_factors(BlendMode mode, float as, float ab) -> composite_factors {
+constexpr auto composite_mode_factors(BlendMode const mode, float const as, float const ab) noexcept -> composite_factors {
   switch (mode) {
     case BlendMode::Plus: return {1.0f, 1.0f};
     case BlendMode::DstIn: return {0.0f, as};
@@ -176,7 +177,7 @@ constexpr auto composite_mode_factors(BlendMode mode, float as, float ab) -> com
   }
 }
 
-constexpr auto uses_porter_duff_only(BlendMode mode) -> bool {
+constexpr auto uses_porter_duff_only(BlendMode const mode) noexcept -> bool {
   return mode == BlendMode::Plus || mode == BlendMode::DstIn || mode == BlendMode::DstOut || mode == BlendMode::SrcAtop || mode == BlendMode::DstAtop;
 }
 
@@ -186,7 +187,7 @@ constexpr auto uses_porter_duff_only(BlendMode mode) -> bool {
  * @param index 読み取り開始位置です。
  * @return 線形色空間へ変換したピクセル値です。
  */
-auto read_pixel(std::span<const uint8_t> rgba, std::size_t index) -> linear_rgba {
+auto read_pixel(std::span<const uint8_t> const rgba, std::size_t const index) noexcept -> linear_rgba {
   return { { srgb_to_linear_component(byte_to_unit(rgba[index + 0])), srgb_to_linear_component(byte_to_unit(rgba[index + 1])), srgb_to_linear_component(byte_to_unit(rgba[index + 2])) }, byte_to_unit(rgba[index + 3]) };
 }
 
@@ -196,7 +197,7 @@ auto read_pixel(std::span<const uint8_t> rgba, std::size_t index) -> linear_rgba
  * @param index 書き込み開始位置です。
  * @param pixel 書き込むピクセル値です。
  */
-auto write_pixel(std::vector<uint8_t>& rgba, std::size_t index, linear_rgba pixel) -> void {
+auto write_pixel(std::vector<uint8_t>& rgba, std::size_t const index, linear_rgba const pixel) noexcept -> void {
   auto const crgb = clamp_rgb(pixel.rgb);
   rgba[index + 0] = unit_to_byte(linear_to_srgb_component(crgb.red));
   rgba[index + 1] = unit_to_byte(linear_to_srgb_component(crgb.green));
@@ -204,7 +205,7 @@ auto write_pixel(std::vector<uint8_t>& rgba, std::size_t index, linear_rgba pixe
   rgba[index + 3] = unit_to_byte(pixel.alpha);
 }
 
-constexpr auto compose_pixel(BlendMode mode, linear_rgba b, linear_rgba s) -> linear_rgba {
+constexpr auto compose_pixel(BlendMode const mode, linear_rgba const b, linear_rgba const s) noexcept -> linear_rgba {
   auto const interacted_s = uses_porter_duff_only(mode) ? s.rgb : add(multiply(s.rgb, 1.0f - b.alpha), multiply(apply_blend_function(mode, b.rgb, s.rgb), b.alpha));
   auto const factors = composite_mode_factors(mode, s.alpha, b.alpha);
   auto const out_a = s.alpha * factors.source + b.alpha * factors.backdrop;
@@ -237,7 +238,7 @@ auto decode_xml_entities(std::string_view str) -> std::string {
   return res;
 }
 
-auto escape_xml(std::string_view str) -> std::string {
+auto escape_xml(std::string_view const str) -> std::string {
   auto res = std::string{};
   for (auto const c : str) {
     switch (c) {
@@ -252,7 +253,7 @@ auto escape_xml(std::string_view str) -> std::string {
   return res;
 }
 
-auto generate_node_xml(Node const& node, int indent_level, std::ostringstream& ss) -> std::string {
+auto generate_node_xml(Node const& node, int const indent_level, std::ostringstream& ss) -> std::string {
   auto xml = std::string(static_cast<std::size_t>(indent_level) * 2U, ' ');
   ss.str("");
   ss.clear();
@@ -328,7 +329,7 @@ namespace detail {
  * @brief `fast_float` で全消費パースできた場合のみ値を返します。
  */
 template<typename T>
-auto parse_number(std::string_view str) -> std::optional<T> {
+auto parse_number(std::string_view const str) noexcept -> std::optional<T> {
   if (str.empty()) {
     return std::nullopt;
   }
@@ -342,15 +343,15 @@ auto parse_number(std::string_view str) -> std::optional<T> {
   return value;
 }
 
-auto parse_uint(std::string_view str) -> std::optional<unsigned long> {
+auto parse_uint(std::string_view const str) noexcept -> std::optional<unsigned long> {
   return parse_number<unsigned long>(str);
 }
 
-auto parse_int(std::string_view str) -> std::optional<int> {
+auto parse_int(std::string_view const str) noexcept -> std::optional<int> {
   return parse_number<int>(str);
 }
 
-auto parse_float(std::string_view str) -> std::optional<float> {
+auto parse_float(std::string_view const str) noexcept -> std::optional<float> {
   return parse_number<float>(str);
 }
 
@@ -361,7 +362,7 @@ ArchiveXmlProvider::~ArchiveXmlProvider() {
   close_archive();
 }
 
-auto ArchiveXmlProvider::open_archive(std::string_view path, ArchiveMode mode) -> std::expected<void, Error> {
+auto ArchiveXmlProvider::open_archive(std::string_view const path, ArchiveMode const mode) -> std::expected<void, Error> {
   if (mode == ArchiveMode::Read) {
     unzip_ = unzOpen(std::string{path}.c_str());
     if (!unzip_) {
@@ -387,7 +388,7 @@ auto ArchiveXmlProvider::close_archive() -> void {
   }
 }
 
-auto ArchiveXmlProvider::read_entry(std::string_view path) -> std::expected<std::vector<uint8_t>, Error> {
+auto ArchiveXmlProvider::read_entry(std::string_view const path) -> std::expected<std::vector<uint8_t>, Error> {
   if (!unzip_) {
     return make_unexpected(Error::Code::ZipReadFailed, path, "archive not open");
   }
@@ -420,7 +421,7 @@ auto ArchiveXmlProvider::read_entry(std::string_view path) -> std::expected<std:
   return data;
 }
 
-auto ArchiveXmlProvider::write_entry(std::string_view path, std::span<const uint8_t> data, CompressionLevel level)
+auto ArchiveXmlProvider::write_entry(std::string_view const path, std::span<const uint8_t> const data, CompressionLevel const level)
     -> std::expected<void, Error> {
   if (!zip_) {
     return make_unexpected(Error::Code::ZipAddFileFailed, path, "archive not open");
@@ -467,7 +468,7 @@ auto ArchiveXmlProvider::serialize_stack(OraDocument const& doc) -> std::string 
   return xml;
 }
 
-auto ArchiveXmlProvider::deserialize_stack(std::span<const uint8_t> xml_bytes) -> std::expected<OraDocument, Error> {
+auto ArchiveXmlProvider::deserialize_stack(std::span<const uint8_t> const xml_bytes) -> std::expected<OraDocument, Error> {
   return ora::detail::deserialize_stack(xml_bytes);
 }
 
@@ -478,7 +479,7 @@ auto ArchiveXmlProvider::deserialize_stack(std::span<const uint8_t> xml_bytes) -
  * @param detail 補足説明です。
  * @return 生成した `std::unexpected<Error>` を返します。
  */
-auto make_unexpected(Error::Code code, std::string_view target, std::string_view detail) -> std::unexpected<Error> {
+auto make_unexpected(Error::Code const code, std::string_view const target, std::string_view const detail) -> std::unexpected<Error> {
   return std::unexpected(Error{code, std::string{target} + (detail.empty() ? "" : ": ") + std::string{detail}});
 }
 
@@ -487,7 +488,7 @@ auto make_unexpected(Error::Code code, std::string_view target, std::string_view
  * @param xml_bytes `stack.xml` の UTF-8 バイト列です。
  * @return 復元したドキュメント、失敗時はエラーを返します。
  */
-auto deserialize_stack(std::span<const uint8_t> xml_bytes) -> std::expected<OraDocument, Error> {
+auto deserialize_stack(std::span<const uint8_t> const xml_bytes) -> std::expected<OraDocument, Error> {
   std::string_view xml(reinterpret_cast<const char*>(xml_bytes.data()), xml_bytes.size());
   OraDocument doc;
   size_t pos = 0;
@@ -579,11 +580,11 @@ auto deserialize_stack(std::span<const uint8_t> xml_bytes) -> std::expected<OraD
  * @param opacity レイヤー不透明度です。
  * @param mode 合成モードです。
  */
-auto blend_layer(std::vector<uint8_t>& canvas, unsigned int cw, unsigned int ch, const ImageBuffer& layer, int lx, int ly, float opacity, BlendMode mode) -> void {
+auto blend_layer(std::vector<uint8_t>& canvas, unsigned int const cw, unsigned int const ch, const ImageBuffer& layer, int const lx, int const ly, float const opacity, BlendMode const mode) -> void {
   for (unsigned int y = 0; y < layer.height(); ++y) {
-    int cy = static_cast<int>(y) + ly; if (cy < 0 || cy >= static_cast<int>(ch)) continue;
+    int const cy = static_cast<int>(y) + ly; if (cy < 0 || cy >= static_cast<int>(ch)) continue;
     for (unsigned int x = 0; x < layer.width(); ++x) {
-      int cx = static_cast<int>(x) + lx; if (cx < 0 || cx >= static_cast<int>(cw)) continue;
+      int const cx = static_cast<int>(x) + lx; if (cx < 0 || cx >= static_cast<int>(cw)) continue;
       auto s = read_pixel(layer.rgba(), (y * layer.width() + x) * 4); s.alpha *= opacity; if (s.alpha <= 0.0f) continue;
       auto b = read_pixel(canvas, (cy * cw + cx) * 4); write_pixel(canvas, (cy * cw + cx) * 4, compose_pixel(mode, b, s));
     }
@@ -601,9 +602,9 @@ auto blend_layer(std::vector<uint8_t>& canvas, unsigned int cw, unsigned int ch,
  * @param parent_y 親スタックの Y オフセットです。
  * @return 合成に成功した場合は空の `expected`、失敗時はエラーを返します。
  */
-auto process_blend(std::vector<uint8_t>& canvas, unsigned int cw, unsigned int ch,
-                   std::span<const Node> nodes, const std::map<std::string, ImageBuffer>& layer_images,
-                   int parent_x, int parent_y) -> std::expected<void, Error> {
+auto process_blend(std::vector<uint8_t>& canvas, unsigned int const cw, unsigned int const ch,
+                   std::span<const Node> const nodes, const std::map<std::string, ImageBuffer>& layer_images,
+                   int const parent_x, int const parent_y) -> std::expected<void, Error> {
   for (auto it = nodes.rbegin(); it != nodes.rend(); ++it) {
     auto const& node = *it; if (!node.visible) continue;
     auto const current_x = parent_x + node.x; auto const current_y = parent_y + node.y;
@@ -629,17 +630,17 @@ auto process_blend(std::vector<uint8_t>& canvas, unsigned int cw, unsigned int c
  * @param dh 出力高さです。
  * @return リサイズ後の RGBA バッファです。
  */
-auto resize_image(const std::vector<uint8_t>& src, unsigned int sw, unsigned int sh, unsigned int dw, unsigned int dh) -> std::vector<uint8_t> {
+auto resize_image(const std::vector<uint8_t>& src, unsigned int const sw, unsigned int const sh, unsigned int const dw, unsigned int const dh) -> std::vector<uint8_t> {
   std::vector<uint8_t> dst(dw * dh * 4);
   for (unsigned int y = 0; y < dh; ++y) {
     for (unsigned int x = 0; x < dw; ++x) {
       unsigned int r=0, g=0, b=0, a=0, c=0;
-      unsigned int y0 = y * sh / dh, y1 = std::max(y0+1, (y+1)*sh/dh);
-      unsigned int x0 = x * sw / dw, x1 = std::max(x0+1, (x+1)*sw/dw);
+      unsigned int const y0 = y * sh / dh, y1 = std::max(y0+1, (y+1)*sh/dh);
+      unsigned int const x0 = x * sw / dw, x1 = std::max(x0+1, (x+1)*sw/dw);
       for (unsigned int sy=y0; sy<y1; ++sy) for (unsigned int sx=x0; sx<x1; ++sx) {
-        auto i = (sy*sw+sx)*4; r+=src[i]; g+=src[i+1]; b+=src[i+2]; a+=src[i+3]; c++;
+        auto const i = (sy*sw+sx)*4; r+=src[i]; g+=src[i+1]; b+=src[i+2]; a+=src[i+3]; c++;
       }
-      auto i = (y*dw+x)*4; dst[i]=r/c; dst[i+1]=g/c; dst[i+2]=b/c; dst[i+3]=a/c;
+      auto const i = (y*dw+x)*4; dst[i]=r/c; dst[i+1]=g/c; dst[i+2]=b/c; dst[i+3]=a/c;
     }
   }
   return dst;
@@ -654,7 +655,7 @@ auto resize_image(const std::vector<uint8_t>& src, unsigned int sw, unsigned int
  * @param rgba RGBA バイト列です。
  * @return 妥当な画像バッファ、失敗時はエラーを返します。
  */
-auto ImageBuffer::create(unsigned int w, unsigned int h, std::vector<uint8_t> rgba) -> std::expected<ImageBuffer, Error> {
+auto ImageBuffer::create(unsigned int const w, unsigned int const h, std::vector<uint8_t> rgba) -> std::expected<ImageBuffer, Error> {
   if (w==0 || h==0 || rgba.size() != static_cast<size_t>(w)*h*4) return detail::make_unexpected(Error::Code::InvalidImageBuffer, "invalid dimensions or size");
   return ImageBuffer(w, h, std::move(rgba));
 }
@@ -668,7 +669,7 @@ auto ImageBuffer::create(unsigned int w, unsigned int h, std::vector<uint8_t> rg
  */
 namespace util {
 
-auto blank_image(unsigned int w, unsigned int h, uint8_t a) -> std::expected<ImageBuffer, Error> {
+auto blank_image(unsigned int const w, unsigned int const h, uint8_t const a) -> std::expected<ImageBuffer, Error> {
   std::vector<uint8_t> rgba(static_cast<size_t>(w)*h*4, 0);
   if (a!=0) for (size_t i=3; i<rgba.size(); i+=4) rgba[i]=a;
   return ImageBuffer::create(w, h, std::move(rgba));
@@ -681,7 +682,7 @@ auto blank_image(unsigned int w, unsigned int h, uint8_t a) -> std::expected<Ima
  * @param m 変換対象モードです。
  * @return `composite-op` 属性に使う文字列です。
  */
-auto to_string(BlendMode m) -> std::string_view {
+auto to_string(BlendMode const m) noexcept -> std::string_view {
   static const std::map<BlendMode, std::string_view> map = {
     {BlendMode::SrcOver, "svg:src-over"}, {BlendMode::Multiply, "svg:multiply"}, {BlendMode::Screen, "svg:screen"}, {BlendMode::Overlay, "svg:overlay"},
     {BlendMode::Darken, "svg:darken"}, {BlendMode::Lighten, "svg:lighten"}, {BlendMode::ColorDodge, "svg:color-dodge"}, {BlendMode::ColorBurn, "svg:color-burn"},
@@ -697,9 +698,9 @@ auto to_string(BlendMode m) -> std::string_view {
  * @param sv 属性文字列です。
  * @return 対応モード、未対応なら `std::nullopt` を返します。
  */
-auto from_string(std::string_view sv) -> std::optional<BlendMode> {
+auto from_string(std::string_view const sv) noexcept -> std::optional<BlendMode> {
   for (int i=0; i<=static_cast<int>(BlendMode::DstAtop); ++i) {
-    auto m = static_cast<BlendMode>(i); if (::ora::to_string(m) == sv) return m;
+    auto const m = static_cast<BlendMode>(i); if (::ora::to_string(m) == sv) return m;
   }
   return std::nullopt;
 }
